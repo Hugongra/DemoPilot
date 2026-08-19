@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail, Lock, User, GitBranch, Globe2 } from "lucide-react";
-import { getSupabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 
@@ -28,13 +28,24 @@ export default function AuthModal({
     setSuccess("");
     setLoading(true);
 
+    const supabase = createClient();
+    if (!supabase) {
+      setError(
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local"
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
-      const supabase = getSupabase();
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name } },
+          options: {
+            data: { full_name: name },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         });
         if (error) throw error;
         setSuccess("Check your email to confirm your account!");
@@ -45,7 +56,10 @@ export default function AuthModal({
         });
         if (error) throw error;
         setSuccess("Signed in! Redirecting…");
-        setTimeout(onClose, 1500);
+        setTimeout(() => {
+          onClose();
+          window.location.reload();
+        }, 1000);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -55,16 +69,18 @@ export default function AuthModal({
   }
 
   async function handleOAuth(provider: "github" | "google") {
-    try {
-      const supabase = getSupabase();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) setError(error.message);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      return;
     }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) setError(error.message);
   }
 
   return (
@@ -85,7 +101,6 @@ export default function AuthModal({
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-2xl"
           >
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-lg font-semibold">
                 {mode === "signup" ? "Create your account" : "Welcome back"}
@@ -99,7 +114,6 @@ export default function AuthModal({
             </div>
 
             <div className="p-6">
-              {/* OAuth buttons */}
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => handleOAuth("github")}
@@ -117,14 +131,12 @@ export default function AuthModal({
                 </button>
               </div>
 
-              {/* Divider */}
               <div className="my-6 flex items-center gap-4">
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-xs text-muted-foreground">or continue with email</span>
                 <div className="h-px flex-1 bg-border" />
               </div>
 
-              {/* Form */}
               <form onSubmit={handleEmailAuth} className="space-y-4">
                 {mode === "signup" && (
                   <div className="relative">
@@ -190,7 +202,6 @@ export default function AuthModal({
                 </button>
               </form>
 
-              {/* Toggle mode */}
               <p className="mt-6 text-center text-sm text-muted-foreground">
                 {mode === "signup" ? "Already have an account?" : "Don't have an account?"}{" "}
                 <button
