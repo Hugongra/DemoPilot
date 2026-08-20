@@ -29,9 +29,14 @@ export async function GET(
     ? `${origin}/api/demos/${id}/asset?file=voiceover.mp3`
     : null;
 
+  const videoUrl = demo.video_url
+    ? `${origin}/api/demos/${id}/asset?file=demo.mp4`
+    : null;
+
   return Response.json({
     ...demo,
     steps: stepsWithScreenshots,
     audio_url: audioUrl,
+    video_url: videoUrl,
   });
 }

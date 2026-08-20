@@ -2,8 +2,10 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { navigateAndCapture } from "@/lib/agent/navigator";
 import { generateScript, generateAudio } from "@/lib/agent/voiceover";
+import { compositeVideo, createVideoFromScreenshots } from "@/lib/agent/compositor";
+import fs from "fs";
 
-export const maxDuration = 300; // 5-minute timeout for long-running generation
+export const maxDuration = 300;
 
 async function updateDemo(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -29,7 +31,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Verify demo exists
     const { data: demo } = await supabase
       .from("demos")
       .select("id")
@@ -40,42 +41,43 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Demo not found" }, { status: 404 });
     }
 
-    // Phase 1: Navigate and capture screenshots
+    // Phase 1: Navigate, record video, and capture screenshots
     await updateDemo(supabase, demoId, {
       status: "navigating",
       steps: [],
     });
 
-    const { steps, narrations } = await navigateAndCapture(
+    const { steps, narrations, videoPath } = await navigateAndCapture(
       targetUrl,
       6,
       async (stepNum, description) => {
-        // Update progress in real time
         const currentSteps = steps
           .slice(0, stepNum)
           .map((s, i) => ({
             index: i + 1,
             description: s.description,
             url: s.url,
+            timestamp: s.timestamp,
           }));
         await updateDemo(supabase, demoId, { steps: currentSteps });
       }
     );
 
-    // Store final steps metadata (without screenshot buffers)
     const stepsMeta = steps.map((s, i) => ({
       index: i + 1,
       description: s.description,
+      narration: s.narration,
       url: s.url,
+      timestamp: s.timestamp,
     }));
     await updateDemo(supabase, demoId, { steps: stepsMeta });
 
-    // Upload screenshots to Supabase Storage
+    // Upload screenshots
     for (let i = 0; i < steps.length; i++) {
-      const path = `demos/${demoId}/step-${i + 1}.jpg`;
+      const filePath = `demos/${demoId}/step-${i + 1}.jpg`;
       const { error: uploadErr } = await supabase.storage
         .from("demo-assets")
-        .upload(path, steps[i].screenshot, {
+        .upload(filePath, steps[i].screenshot, {
           contentType: "image/jpeg",
           upsert: true,
         });
@@ -86,34 +88,89 @@ export async function POST(request: NextRequest) {
 
     // Phase 2: Generate voiceover script
     await updateDemo(supabase, demoId, { status: "scripting" });
-
     const script = await generateScript(narrations, targetUrl);
     await updateDemo(supabase, demoId, { script });
 
     // Phase 3: Generate TTS audio
     await updateDemo(supabase, demoId, { status: "generating_audio" });
-
     const audioBuffer = await generateAudio(script);
 
-    // Upload audio to Supabase Storage
-    const audioPath = `demos/${demoId}/voiceover.mp3`;
+    const audioStoragePath = `demos/${demoId}/voiceover.mp3`;
     await supabase.storage
       .from("demo-assets")
-      .upload(audioPath, audioBuffer, {
+      .upload(audioStoragePath, audioBuffer, {
         contentType: "audio/mpeg",
         upsert: true,
       });
 
+    // Write audio to temp file for FFmpeg
+    const tmpAudioPath = videoPath.replace(/[^/\\]+$/, "voiceover.mp3");
+    fs.writeFileSync(tmpAudioPath, audioBuffer);
+
+    // Phase 4: Composite final video (video + audio → MP4)
+    await updateDemo(supabase, demoId, { status: "compositing" });
+
+    let finalVideoPath: string;
+    try {
+      if (videoPath && fs.existsSync(videoPath)) {
+        finalVideoPath = await compositeVideo(videoPath, tmpAudioPath);
+      } else {
+        finalVideoPath = await createVideoFromScreenshots(
+          steps.map((s) => s.screenshot),
+          tmpAudioPath
+        );
+      }
+    } catch (err) {
+      console.error("Compositing error, falling back to screenshots:", err);
+      finalVideoPath = await createVideoFromScreenshots(
+        steps.map((s) => s.screenshot),
+        tmpAudioPath
+      );
+    }
+
+    // Upload final MP4
+    const videoBuffer = fs.readFileSync(finalVideoPath);
+    const videoStoragePath = `demos/${demoId}/demo.mp4`;
+    const { error: videoUploadErr } = await supabase.storage
+      .from("demo-assets")
+      .upload(videoStoragePath, videoBuffer, {
+        contentType: "video/mp4",
+        upsert: true,
+      });
+
+    if (videoUploadErr) {
+      console.error("Failed to upload video:", videoUploadErr.message);
+    }
+
+    // Phase 5: Done
     const { data: audioUrlData } = supabase.storage
       .from("demo-assets")
-      .getPublicUrl(audioPath);
+      .getPublicUrl(audioStoragePath);
 
-    // Phase 4: Mark as done
+    const { data: videoUrlData } = supabase.storage
+      .from("demo-assets")
+      .getPublicUrl(videoStoragePath);
+
     await updateDemo(supabase, demoId, {
       status: "done",
       audio_url: audioUrlData.publicUrl,
+      video_url: videoUrlData.publicUrl,
       steps: stepsMeta,
     });
+
+    // Cleanup temp files
+    try {
+      if (videoPath) {
+        const tmpDir = videoPath.replace(/[/\\][^/\\]+$/, "");
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+      if (finalVideoPath) {
+        const outDir = finalVideoPath.replace(/[/\\][^/\\]+$/, "");
+        fs.rmSync(outDir, { recursive: true, force: true });
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
 
     return Response.json({
       success: true,
@@ -121,11 +178,11 @@ export async function POST(request: NextRequest) {
       steps: stepsMeta,
       script,
       audioUrl: audioUrlData.publicUrl,
+      videoUrl: videoUrlData.publicUrl,
     });
   } catch (error) {
     console.error("Demo generation error:", error);
 
-    // Try to update demo with error status
     try {
       const { demoId } = await request.clone().json();
       if (demoId) {

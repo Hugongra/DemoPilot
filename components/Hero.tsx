@@ -16,6 +16,8 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Film,
+  Download,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -25,6 +27,7 @@ type DemoStatus =
   | "navigating"
   | "scripting"
   | "generating_audio"
+  | "compositing"
   | "done"
   | "error";
 
@@ -34,6 +37,7 @@ const STATUS_LABELS: Record<DemoStatus, string> = {
   navigating: "AI agent is exploring your product…",
   scripting: "Writing voiceover script…",
   generating_audio: "Generating voiceover audio…",
+  compositing: "Creating final video…",
   done: "Demo ready!",
   error: "Something went wrong",
 };
@@ -44,6 +48,7 @@ const STATUS_ICONS: Record<DemoStatus, React.ReactNode> = {
   navigating: <Monitor className="h-4 w-4" />,
   scripting: <FileText className="h-4 w-4" />,
   generating_audio: <Volume2 className="h-4 w-4" />,
+  compositing: <Film className="h-4 w-4" />,
   done: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
   error: <AlertCircle className="h-4 w-4 text-red-500" />,
 };
@@ -287,7 +292,7 @@ export default function Hero({ onOpenAuth }: { onOpenAuth: () => void }) {
                 </motion.div>
               )}
 
-              {/* View & Share demo when done */}
+              {/* View, Download & Share demo when done */}
               {status === "done" && demoId && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -300,6 +305,14 @@ export default function Hero({ onOpenAuth }: { onOpenAuth: () => void }) {
                   >
                     <ExternalLink className="h-4 w-4" />
                     View Demo
+                  </a>
+                  <a
+                    href={`/api/demos/${demoId}/asset?file=demo.mp4`}
+                    download={`demopilot-${demoId}.mp4`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-warm bg-warm/5 px-6 py-3 text-sm font-semibold text-warm shadow-sm transition-all hover:bg-warm/10"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download MP4
                   </a>
                   <button
                     onClick={() => {

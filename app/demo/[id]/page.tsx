@@ -11,14 +11,23 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  Download,
+  GripVertical,
+  Pencil,
+  X,
+  Save,
+  Trash2,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 
 interface DemoStep {
   index: number;
   description: string;
+  narration: string;
   url: string;
   screenshotUrl: string;
+  timestamp: number;
 }
 
 interface DemoData {
@@ -28,6 +37,7 @@ interface DemoData {
   steps: DemoStep[];
   script: string | null;
   audio_url: string | null;
+  video_url: string | null;
   created_at: string;
   error: string | null;
 }
@@ -37,10 +47,17 @@ export default function DemoViewer() {
   const [demo, setDemo] = useState<DemoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [copied, setCopied] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  // Editor state
+  const [editing, setEditing] = useState(false);
+  const [editedScript, setEditedScript] = useState("");
+  const [editedSteps, setEditedSteps] = useState<DemoStep[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     async function fetchDemo() {
@@ -49,6 +66,8 @@ export default function DemoViewer() {
         if (!res.ok) throw new Error("Not found");
         const data = await res.json();
         setDemo(data);
+        if (data.script) setEditedScript(data.script);
+        if (data.steps) setEditedSteps(data.steps);
       } catch {
         setDemo(null);
       } finally {
@@ -58,46 +77,78 @@ export default function DemoViewer() {
     fetchDemo();
   }, [id]);
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  function handlePlay() {
-    if (!demo?.steps.length) return;
-
-    if (isPlaying) {
-      setIsPlaying(false);
-      audioRef.current?.pause();
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      return;
-    }
-
-    setIsPlaying(true);
-    setCurrentStep(0);
-    audioRef.current?.play();
-
-    const stepDuration = demo.audio_url
-      ? ((audioRef.current?.duration || 30) / demo.steps.length) * 1000
-      : 4000;
-
-    intervalRef.current = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev >= demo.steps.length - 1) {
-          setIsPlaying(false);
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, stepDuration);
-  }
-
   function handleCopyLink() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleDownload() {
+    if (!demo?.video_url) return;
+    const videoUrl = `/api/demos/${id}/asset?file=demo.mp4`;
+    const a = document.createElement("a");
+    a.href = videoUrl;
+    a.download = `demopilot-${id}.mp4`;
+    a.click();
+  }
+
+  // Drag-and-drop reorder
+  function handleDragStart(idx: number) {
+    setDragIdx(idx);
+  }
+
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+
+    const newSteps = [...editedSteps];
+    const [dragged] = newSteps.splice(dragIdx, 1);
+    newSteps.splice(idx, 0, dragged);
+    setEditedSteps(newSteps.map((s, i) => ({ ...s, index: i + 1 })));
+    setDragIdx(idx);
+  }
+
+  function handleDeleteStep(idx: number) {
+    const newSteps = editedSteps
+      .filter((_, i) => i !== idx)
+      .map((s, i) => ({ ...s, index: i + 1 }));
+    setEditedSteps(newSteps);
+  }
+
+  async function handleSaveEdits() {
+    if (!demo) return;
+    setSaving(true);
+
+    try {
+      await fetch(`/api/demos/${id}/edit`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          script: editedScript,
+          steps: editedSteps,
+        }),
+      });
+
+      setDemo({
+        ...demo,
+        script: editedScript,
+        steps: editedSteps,
+      });
+      setEditing(false);
+    } catch {
+      // Silently fail
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Jump video to step timestamp
+  function jumpToStep(idx: number) {
+    setCurrentStep(idx);
+    const step = (editing ? editedSteps : demo?.steps)?.[idx];
+    if (videoRef.current && step?.timestamp != null) {
+      videoRef.current.currentTime = step.timestamp;
+    }
   }
 
   if (loading) {
@@ -137,7 +188,10 @@ export default function DemoViewer() {
     );
   }
 
-  const step = demo.steps[currentStep];
+  const displaySteps = editing ? editedSteps : demo.steps;
+  const step = displaySteps[currentStep];
+  const videoUrl = `/api/demos/${id}/asset?file=demo.mp4`;
+  const hasVideo = !!demo.video_url;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -153,7 +207,43 @@ export default function DemoViewer() {
             </div>
             DemoPilot
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-stone-50 hover:text-foreground"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            )}
+            {editing && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditing(false);
+                    setEditedScript(demo.script || "");
+                    setEditedSteps(demo.steps);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-stone-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdits}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  Save
+                </button>
+              </>
+            )}
             <a
               href={demo.target_url}
               target="_blank"
@@ -163,6 +253,15 @@ export default function DemoViewer() {
               <ExternalLink className="h-3.5 w-3.5" />
               Visit site
             </a>
+            {hasVideo && (
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 rounded-lg border border-warm bg-warm/5 px-3 py-1.5 text-sm font-medium text-warm transition-colors hover:bg-warm/10"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download MP4
+              </button>
+            )}
             <button
               onClick={handleCopyLink}
               className="flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-1.5 text-sm font-medium text-white transition-all hover:opacity-80"
@@ -173,7 +272,7 @@ export default function DemoViewer() {
                 </>
               ) : (
                 <>
-                  <Copy className="h-3.5 w-3.5" /> Share link
+                  <Copy className="h-3.5 w-3.5" /> Share
                 </>
               )}
             </button>
@@ -192,125 +291,205 @@ export default function DemoViewer() {
           </span>
         </div>
 
-        {/* Main viewer */}
-        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
-          {/* Mock browser chrome */}
-          <div className="flex items-center gap-2 border-b border-border bg-stone-50 px-4 py-3">
-            <div className="flex gap-1.5">
-              <div className="h-3 w-3 rounded-full bg-red-400" />
-              <div className="h-3 w-3 rounded-full bg-yellow-400" />
-              <div className="h-3 w-3 rounded-full bg-green-400" />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Video player - 2/3 width */}
+          <div className="lg:col-span-2">
+            <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
+              {/* Mock browser chrome */}
+              <div className="flex items-center gap-2 border-b border-border bg-stone-50 px-4 py-3">
+                <div className="flex gap-1.5">
+                  <div className="h-3 w-3 rounded-full bg-red-400" />
+                  <div className="h-3 w-3 rounded-full bg-yellow-400" />
+                  <div className="h-3 w-3 rounded-full bg-green-400" />
+                </div>
+                <div className="flex-1 rounded-md bg-white px-3 py-1 text-center text-xs text-muted-foreground">
+                  {step?.url || demo.target_url}
+                </div>
+              </div>
+
+              {/* Video or screenshot */}
+              <div className="relative aspect-video bg-black">
+                {hasVideo ? (
+                  <video
+                    ref={videoRef}
+                    className="h-full w-full"
+                    controls
+                    muted={muted}
+                    src={videoUrl}
+                    onTimeUpdate={() => {
+                      if (!videoRef.current || !displaySteps.length) return;
+                      const time = videoRef.current.currentTime;
+                      for (let i = displaySteps.length - 1; i >= 0; i--) {
+                        if (time >= (displaySteps[i].timestamp || 0)) {
+                          if (i !== currentStep) setCurrentStep(i);
+                          break;
+                        }
+                      }
+                    }}
+                  >
+                    <track kind="captions" />
+                  </video>
+                ) : step?.screenshotUrl ? (
+                  <img
+                    src={step.screenshotUrl}
+                    alt={step.description}
+                    className="h-full w-full object-cover object-top"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-white/50">
+                    No media available
+                  </div>
+                )}
+              </div>
+
+              {/* Step navigation bar */}
+              <div className="flex items-center gap-3 border-t border-border bg-white px-4 py-2.5">
+                <button
+                  onClick={() => jumpToStep(Math.max(0, currentStep - 1))}
+                  disabled={currentStep === 0}
+                  className="rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-stone-50 disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="min-w-[3.5rem] text-center text-sm font-medium">
+                  {currentStep + 1} / {displaySteps.length}
+                </span>
+                <button
+                  onClick={() =>
+                    jumpToStep(
+                      Math.min(displaySteps.length - 1, currentStep + 1)
+                    )
+                  }
+                  disabled={currentStep === displaySteps.length - 1}
+                  className="rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-stone-50 disabled:opacity-30"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+
+                <div className="flex flex-1 items-center justify-center gap-1">
+                  {displaySteps.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => jumpToStep(i)}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === currentStep
+                          ? "w-5 bg-warm"
+                          : "w-1.5 bg-stone-200 hover:bg-stone-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setMuted(!muted)}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-stone-50"
+                >
+                  {muted ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="flex-1 rounded-md bg-white px-3 py-1 text-center text-xs text-muted-foreground">
-              {step?.url || demo.target_url}
-            </div>
+
+            {/* Current step description */}
+            {step && (
+              <p className="mt-3 text-center text-sm text-muted-foreground">
+                {step.description}
+              </p>
+            )}
           </div>
 
-          {/* Screenshot */}
-          <div className="relative aspect-video bg-stone-100">
-            {step?.screenshotUrl ? (
-              <img
-                src={step.screenshotUrl}
-                alt={step.description}
-                className="h-full w-full object-cover object-top transition-opacity duration-500"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                No screenshot available
+          {/* Steps sidebar - 1/3 width */}
+          <div className="space-y-4">
+            {/* Steps list */}
+            <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Steps {editing && "(drag to reorder)"}
+              </h3>
+              <div className="space-y-1.5">
+                {displaySteps.map((s, i) => (
+                  <div
+                    key={`step-${i}`}
+                    draggable={editing}
+                    onDragStart={() => handleDragStart(i)}
+                    onDragOver={(e) => handleDragOver(e, i)}
+                    onDragEnd={() => setDragIdx(null)}
+                    onClick={() => jumpToStep(i)}
+                    className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition-colors cursor-pointer ${
+                      i === currentStep
+                        ? "bg-warm/10 text-foreground"
+                        : "text-muted-foreground hover:bg-stone-50"
+                    } ${editing ? "cursor-grab active:cursor-grabbing" : ""}`}
+                  >
+                    {editing && (
+                      <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-stone-300" />
+                    )}
+                    <span
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        i === currentStep
+                          ? "bg-warm text-white"
+                          : "bg-stone-100 text-stone-500"
+                      }`}
+                    >
+                      {s.index}
+                    </span>
+                    <span className="flex-1 line-clamp-2">
+                      {s.description}
+                    </span>
+                    {editing && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteStep(i);
+                        }}
+                        className="shrink-0 rounded p-0.5 text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Script section */}
+            <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Voiceover Script
+              </h3>
+              {editing ? (
+                <textarea
+                  value={editedScript}
+                  onChange={(e) => setEditedScript(e.target.value)}
+                  rows={8}
+                  className="w-full rounded-lg border border-border p-3 text-sm leading-relaxed text-foreground/80 focus:border-foreground focus:outline-none focus:ring-1 focus:ring-foreground/10"
+                />
+              ) : (
+                <p className="text-sm leading-relaxed text-foreground/80">
+                  {demo.script || "No script generated."}
+                </p>
+              )}
+            </div>
+
+            {/* Audio */}
+            {demo.audio_url && (
+              <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Audio
+                </h3>
+                <audio
+                  controls
+                  className="w-full"
+                  src={`/api/demos/${id}/asset?file=voiceover.mp3`}
+                >
+                  <track kind="captions" />
+                </audio>
               </div>
             )}
           </div>
-
-          {/* Controls bar */}
-          <div className="flex items-center gap-4 border-t border-border bg-white px-5 py-3">
-            <button
-              onClick={handlePlay}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-warm text-white transition-all hover:opacity-80"
-            >
-              {isPlaying ? (
-                <Pause className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4 ml-0.5" />
-              )}
-            </button>
-
-            {/* Step navigation */}
-            <button
-              onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-              disabled={currentStep === 0}
-              className="rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-stone-50 disabled:opacity-30"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="min-w-[4rem] text-center text-sm font-medium">
-              {currentStep + 1} / {demo.steps.length}
-            </span>
-            <button
-              onClick={() =>
-                setCurrentStep(
-                  Math.min(demo.steps.length - 1, currentStep + 1)
-                )
-              }
-              disabled={currentStep === demo.steps.length - 1}
-              className="rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-stone-50 disabled:opacity-30"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-
-            {/* Step progress dots */}
-            <div className="flex flex-1 items-center justify-center gap-1.5">
-              {demo.steps.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentStep(i)}
-                  className={`h-2 rounded-full transition-all ${
-                    i === currentStep
-                      ? "w-6 bg-warm"
-                      : i < currentStep
-                        ? "w-2 bg-warm/40"
-                        : "w-2 bg-stone-200"
-                  }`}
-                />
-              ))}
-            </div>
-
-            {demo.audio_url && (
-              <Volume2 className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
         </div>
-
-        {/* Step description */}
-        {step && (
-          <div className="mt-4 text-center">
-            <p className="text-sm text-muted-foreground">{step.description}</p>
-          </div>
-        )}
-
-        {/* Script section */}
-        {demo.script && (
-          <div className="mt-8 rounded-xl border border-border bg-white p-6">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Voiceover Script
-            </h3>
-            <p className="leading-relaxed text-foreground/80">{demo.script}</p>
-          </div>
-        )}
-
-        {/* Audio player */}
-        {demo.audio_url && (
-          <div className="mt-4 rounded-xl border border-border bg-white p-4">
-            <audio
-              ref={audioRef}
-              controls
-              className="w-full"
-              src={demo.audio_url}
-              onEnded={() => setIsPlaying(false)}
-            >
-              <track kind="captions" />
-            </audio>
-          </div>
-        )}
       </main>
     </div>
   );
