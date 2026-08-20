@@ -11,10 +11,14 @@ create table if not exists public.demos (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references auth.users(id) on delete set null,
   target_url  text not null,
-  screenshot_url text,
+  status      text not null default 'pending' check (status in ('pending','navigating','scripting','generating_audio','compositing','done','error')),
+  steps       jsonb default '[]'::jsonb,
   script      text,
   audio_url   text,
-  created_at  timestamptz default now()
+  video_url   text,
+  error       text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
 );
 
 comment on table public.demos is 'Stores every generated demo, optionally linked to a user.';
@@ -36,11 +40,11 @@ create policy "Authenticated and anonymous insert"
   for insert
   with check (true);
 
--- Only the owner can update their own demos
+-- Owner or the original creator can update their demos
 create policy "Owner update"
   on public.demos
   for update
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id or user_id is null);
 
 -- Only the owner can delete their own demos
 create policy "Owner delete"
