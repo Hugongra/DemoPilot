@@ -9,13 +9,13 @@ export interface NavStep {
   description: string;
   narration: string;
   url: string;
-  timestamp: number; // seconds into the video
+  timestamp: number;
 }
 
 export interface NavigationResult {
   steps: NavStep[];
   narrations: string[];
-  videoPath: string; // path to the raw .webm recording
+  videoPath: string;
 }
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -34,12 +34,13 @@ Respond ONLY with valid JSON (no markdown fences):
 
 Rules:
 - Explore the most visually impressive and important features
-- Click on navigation links, buttons, and interactive elements
+- Click on navigation links, buttons, and interactive elements to show different pages
 - After 5-7 steps, set action to "done"
 - Keep narrations concise, professional, and marketing-friendly
 - Selectors should be specific (use data attributes, aria labels, or unique text content)
 - Prefer visible, above-the-fold interactive elements
-- Avoid clicking on external links, login forms, or cookie banners`;
+- Avoid clicking on external links, login forms, or cookie banners
+- Scroll down to reveal hidden content before clicking`;
 
 async function screenshotToBase64(page: Page): Promise<string> {
   const buffer = await page.screenshot({ fullPage: false, type: "jpeg", quality: 80 });
@@ -88,10 +89,6 @@ async function askGPT4o(
   return JSON.parse(cleaned);
 }
 
-/**
- * Smoothly moves the mouse to a target position with easing,
- * simulating natural human cursor movement.
- */
 async function animateCursor(
   page: Page,
   fromX: number,
@@ -99,49 +96,39 @@ async function animateCursor(
   toX: number,
   toY: number
 ) {
-  const steps = 25;
-  const duration = 600; // ms
+  const steps = 30;
+  const duration = 700;
   const stepDelay = duration / steps;
 
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    // Ease-in-out cubic
     const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
     const x = fromX + (toX - fromX) * ease;
     const y = fromY + (toY - fromY) * ease;
-
     await page.mouse.move(x, y);
     await page.waitForTimeout(stepDelay);
   }
 }
 
-/**
- * Injects a visible custom cursor overlay into the page.
- * This cursor is visible in the video recording.
- */
 async function injectCursorOverlay(page: Page) {
   await page.evaluate(() => {
     if (document.getElementById("demopilot-cursor")) return;
-
     const cursor = document.createElement("div");
     cursor.id = "demopilot-cursor";
     Object.assign(cursor.style, {
       position: "fixed",
       top: "0px",
       left: "0px",
-      width: "24px",
-      height: "24px",
+      width: "28px",
+      height: "28px",
       zIndex: "999999",
       pointerEvents: "none",
-      transition: "transform 0.05s linear",
-      transform: "translate(-50%, -50%)",
+      filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
     });
-    cursor.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M5 3L19 12L12 13L9 20L5 3Z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+    cursor.innerHTML = `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 3L22 14L14 15L10 23L6 3Z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
     </svg>`;
     document.body.appendChild(cursor);
-
     document.addEventListener("mousemove", (e) => {
       cursor.style.left = e.clientX + "px";
       cursor.style.top = e.clientY + "px";
@@ -175,15 +162,11 @@ export async function navigateAndCapture(
     });
 
     const page = await context.newPage();
-
-    // Hide default cursor and inject custom visible one
     await page.addStyleTag({ content: "* { cursor: none !important; }" });
-
     await page.goto(targetUrl, { waitUntil: "networkidle", timeout: 30000 });
     await page.waitForTimeout(1500);
     await injectCursorOverlay(page);
 
-    // Start cursor at center
     let cursorX = 640;
     let cursorY = 400;
     await page.mouse.move(cursorX, cursorY);
@@ -217,7 +200,6 @@ export async function navigateAndCapture(
         timestamp,
       });
       narrations.push(gptResponse.narration);
-
       onStep?.(i, gptResponse.description);
 
       if (gptResponse.action === "done") break;
@@ -232,29 +214,25 @@ export async function navigateAndCapture(
                 if (box) {
                   const targetX = box.x + box.width / 2;
                   const targetY = box.y + box.height / 2;
-
-                  // Animate cursor to element
                   await animateCursor(page, cursorX, cursorY, targetX, targetY);
                   cursorX = targetX;
                   cursorY = targetY;
-
                   await page.waitForTimeout(200);
                   await element.click();
-                  await page.waitForTimeout(2000);
+                  await page.waitForTimeout(2500);
                 } else {
                   await page.click(gptResponse.selector, { timeout: 5000 });
-                  await page.waitForTimeout(2000);
+                  await page.waitForTimeout(2500);
                 }
               } else {
                 await page.click(gptResponse.selector, { timeout: 5000 });
-                await page.waitForTimeout(2000);
+                await page.waitForTimeout(2500);
               }
-              // Re-inject cursor after navigation
               await injectCursorOverlay(page);
             }
             break;
           case "scroll":
-            await page.evaluate(() => window.scrollBy(0, 500));
+            await page.evaluate(() => window.scrollBy({ top: 500, behavior: "smooth" }));
             await page.waitForTimeout(1500);
             break;
           case "type":
@@ -269,7 +247,6 @@ export async function navigateAndCapture(
                 }
               }
               await page.fill(gptResponse.selector, "");
-              // Type character by character for visual effect
               for (const char of gptResponse.text) {
                 await page.keyboard.type(char, { delay: 80 });
               }
@@ -282,17 +259,32 @@ export async function navigateAndCapture(
       }
     }
 
-    // Final pause for the video
     await page.waitForTimeout(2000);
 
-    // Close page to finalize video
+    // Get the video path from Playwright's API — must call before page.close()
+    const video = page.video();
     await page.close();
 
-    // Get the recorded video path
-    const videoFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith(".webm"));
-    const videoPath = videoFiles.length > 0 ? path.join(tmpDir, videoFiles[0]) : "";
+    let videoPath = "";
+    if (video) {
+      try {
+        videoPath = await video.path();
+      } catch {
+        // Video path may not be available
+      }
+    }
 
     await context.close();
+
+    // Double-check: if video path is empty, look for webm files in tmpDir
+    if (!videoPath || !fs.existsSync(/* turbopackIgnore: true */ videoPath)) {
+      const videoFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith(".webm"));
+      if (videoFiles.length > 0) {
+        videoPath = path.join(tmpDir, videoFiles[0]);
+      }
+    }
+
+    console.log(`[DemoPilot] Video recorded: ${videoPath} (exists: ${videoPath ? fs.existsSync(/* turbopackIgnore: true */ videoPath) : false})`);
 
     return { steps, narrations, videoPath };
   } finally {

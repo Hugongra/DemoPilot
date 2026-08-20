@@ -4,6 +4,8 @@ import { navigateAndCapture } from "@/lib/agent/navigator";
 import { generateScript, generateAudio } from "@/lib/agent/voiceover";
 import { compositeVideo, createVideoFromScreenshots } from "@/lib/agent/compositor";
 import fs from "fs";
+import path from "path";
+import os from "os";
 
 export const maxDuration = 300;
 
@@ -19,6 +21,9 @@ async function updateDemo(
 }
 
 export async function POST(request: NextRequest) {
+  const tmpWorkDir = path.join(os.tmpdir(), `demopilot-work-${Date.now()}`);
+  fs.mkdirSync(tmpWorkDir, { recursive: true });
+
   try {
     const { demoId, targetUrl } = await request.json();
 
@@ -42,26 +47,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Phase 1: Navigate, record video, and capture screenshots
-    await updateDemo(supabase, demoId, {
-      status: "navigating",
-      steps: [],
-    });
+    await updateDemo(supabase, demoId, { status: "navigating", steps: [] });
 
-    const { steps, narrations, videoPath } = await navigateAndCapture(
-      targetUrl,
-      6,
-      async (stepNum, description) => {
-        const currentSteps = steps
-          .slice(0, stepNum)
-          .map((s, i) => ({
-            index: i + 1,
-            description: s.description,
-            url: s.url,
-            timestamp: s.timestamp,
-          }));
-        await updateDemo(supabase, demoId, { steps: currentSteps });
-      }
-    );
+    const { steps, narrations, videoPath } = await navigateAndCapture(targetUrl, 6);
 
     const stepsMeta = steps.map((s, i) => ({
       index: i + 1,
@@ -104,17 +92,21 @@ export async function POST(request: NextRequest) {
       });
 
     // Write audio to temp file for FFmpeg
-    const tmpAudioPath = videoPath.replace(/[^/\\]+$/, "voiceover.mp3");
+    const tmpAudioPath = path.join(tmpWorkDir, "voiceover.mp3");
     fs.writeFileSync(tmpAudioPath, audioBuffer);
 
-    // Phase 4: Composite final video (video + audio → MP4)
+    // Phase 4: Composite final video
     await updateDemo(supabase, demoId, { status: "compositing" });
 
     let finalVideoPath: string;
+    const hasRealVideo = videoPath && fs.existsSync(videoPath);
+    console.log(`[DemoPilot] Compositing: hasRealVideo=${hasRealVideo}, videoPath=${videoPath}`);
+
     try {
-      if (videoPath && fs.existsSync(videoPath)) {
+      if (hasRealVideo) {
         finalVideoPath = await compositeVideo(videoPath, tmpAudioPath);
       } else {
+        console.log("[DemoPilot] No video recording found, creating from screenshots");
         finalVideoPath = await createVideoFromScreenshots(
           steps.map((s) => s.screenshot),
           tmpAudioPath
@@ -143,33 +135,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Phase 5: Done
-    const { data: audioUrlData } = supabase.storage
-      .from("demo-assets")
-      .getPublicUrl(audioStoragePath);
-
-    const { data: videoUrlData } = supabase.storage
-      .from("demo-assets")
-      .getPublicUrl(videoStoragePath);
-
     await updateDemo(supabase, demoId, {
       status: "done",
-      audio_url: audioUrlData.publicUrl,
-      video_url: videoUrlData.publicUrl,
+      audio_url: audioStoragePath,
+      video_url: videoStoragePath,
       steps: stepsMeta,
     });
 
-    // Cleanup temp files
+    // Cleanup
     try {
+      fs.rmSync(tmpWorkDir, { recursive: true, force: true });
       if (videoPath) {
-        const tmpDir = videoPath.replace(/[/\\][^/\\]+$/, "");
-        fs.rmSync(tmpDir, { recursive: true, force: true });
+        const videoDir = path.dirname(videoPath);
+        if (fs.existsSync(videoDir)) {
+          fs.rmSync(videoDir, { recursive: true, force: true });
+        }
       }
-      if (finalVideoPath) {
-        const outDir = finalVideoPath.replace(/[/\\][^/\\]+$/, "");
+      const outDir = path.dirname(finalVideoPath);
+      if (fs.existsSync(outDir)) {
         fs.rmSync(outDir, { recursive: true, force: true });
       }
     } catch {
-      // Ignore cleanup errors
+      // Ignore
     }
 
     return Response.json({
@@ -177,8 +164,6 @@ export async function POST(request: NextRequest) {
       demoId,
       steps: stepsMeta,
       script,
-      audioUrl: audioUrlData.publicUrl,
-      videoUrl: videoUrlData.publicUrl,
     });
   } catch (error) {
     console.error("Demo generation error:", error);
@@ -193,8 +178,11 @@ export async function POST(request: NextRequest) {
         });
       }
     } catch {
-      // Ignore cleanup errors
+      // Ignore
     }
+
+    // Cleanup
+    try { fs.rmSync(tmpWorkDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
     return Response.json(
       { error: error instanceof Error ? error.message : "Generation failed" },

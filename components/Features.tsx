@@ -6,7 +6,7 @@ import {
   BrainCircuit,
   Film,
   Captions,
-  Palette,
+  Code2,
   Share2,
 } from "lucide-react";
 
@@ -15,37 +15,37 @@ const features = [
     icon: Globe,
     title: "Paste Any URL",
     description:
-      "Just drop your product link. Our agent loads it in a real browser — no SDK integration, no scripts.",
+      "Drop your product link. The AI agent loads it in a real Chromium browser — no SDK, no scripts, no setup.",
   },
   {
     icon: BrainCircuit,
-    title: "AI Agent Navigation",
+    title: "GPT-4o Vision Agent",
     description:
-      "An intelligent agent clicks through key flows, understands your UI, and picks the best demo path automatically.",
+      "An AI agent with vision sees your UI, decides what to click, and navigates the most impressive product flows.",
   },
   {
     icon: Film,
-    title: "HD Video Recording",
+    title: "Real Video Recording",
     description:
-      "Every interaction is recorded at 1080p with smooth cursor animations and polished transitions.",
+      "Playwright records the entire browser session with animated cursor movements, then FFmpeg composites the final MP4.",
   },
   {
     icon: Captions,
-    title: "Auto Voiceover & Captions",
+    title: "AI Voiceover",
     description:
-      "AI-generated narration and captions explain each step in a natural, professional tone.",
+      "GPT-4o writes a professional demo script from the navigation, then OpenAI TTS generates natural voiceover audio.",
   },
   {
-    icon: Palette,
-    title: "Brand Customization",
+    icon: Code2,
+    title: "100% Open Source",
     description:
-      "Add your logo, brand colors, intro slides, and custom CTAs. Make every demo unmistakably yours.",
+      "Self-host the entire stack. Next.js + Supabase + Playwright + OpenAI. Fork it, extend it, make it yours.",
   },
   {
     icon: Share2,
-    title: "One-Click Sharing",
+    title: "Share & Export",
     description:
-      "Get a shareable link, embed code, or download the MP4. Push directly to your docs or sales deck.",
+      "Get a shareable link, edit the script, reorder steps, or download the MP4. Full control over your demos.",
   },
 ];
 
@@ -70,7 +70,7 @@ export default function Features() {
             viewport={{ once: true }}
             className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-warm"
           >
-            What a DemoPilot agent can do for you
+            Open-source AI demo platform
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 12 }}

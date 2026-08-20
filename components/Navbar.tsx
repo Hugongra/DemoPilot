@@ -63,6 +63,14 @@ export default function Navbar({ onOpenAuth }: { onOpenAuth: () => void }) {
           <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Pricing
           </a>
+          <a
+            href="https://github.com/Hugongra/DemoPilot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            GitHub
+          </a>
 
           {user ? (
             <div className="relative">
@@ -98,6 +106,12 @@ export default function Navbar({ onOpenAuth }: { onOpenAuth: () => void }) {
                         {user.email}
                       </p>
                     </div>
+                    <a
+                      href="/dashboard"
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-stone-50"
+                    >
+                      Dashboard
+                    </a>
                     <button
                       onClick={handleSignOut}
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"

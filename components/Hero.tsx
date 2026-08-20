@@ -182,7 +182,7 @@ export default function Hero({ onOpenAuth }: { onOpenAuth: () => void }) {
           className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-white/80 px-4 py-1.5 text-sm text-muted-foreground backdrop-blur-sm"
         >
           <Sparkles className="h-4 w-4 text-warm" />
-          AI-powered product demos in minutes
+          Open-source AI demo platform
         </motion.div>
 
         <motion.h1
@@ -201,9 +201,9 @@ export default function Hero({ onOpenAuth }: { onOpenAuth: () => void }) {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground sm:text-xl"
         >
-          Paste your product URL, and our AI agent navigates it, records a
-          polished walkthrough, and delivers a share-ready video — no scripting
-          needed.
+          The open-source platform for AI-generated product demos. Paste a URL,
+          and an AI agent navigates your product, records the session, writes a
+          voiceover script, and exports a share-ready MP4.
         </motion.p>
 
         <motion.div
