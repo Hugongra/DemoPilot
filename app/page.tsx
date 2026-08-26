@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import DemoPlayer from "@/components/DemoPlayer";
-import Pricing from "@/components/Pricing";
+import OpenSource from "@/components/OpenSource";
 import AuthModal from "@/components/AuthModal";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
@@ -19,12 +19,8 @@ export default function Home() {
     const supabase = createClient();
     if (!supabase) return;
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) router.push("/dashboard");
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) router.push("/dashboard");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") router.push("/dashboard");
     });
 
     return () => subscription.unsubscribe();
@@ -36,7 +32,7 @@ export default function Home() {
       <Hero onOpenAuth={() => setAuthOpen(true)} />
       <Features />
       <DemoPlayer />
-      <Pricing onOpenAuth={() => setAuthOpen(true)} />
+      <OpenSource />
       <Footer />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </>

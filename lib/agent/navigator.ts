@@ -18,9 +18,28 @@ export interface NavigationResult {
   videoPath: string;
 }
 
+export interface NavigationOptions {
+  maxSteps?: number;
+  language?: string;
+  prospectName?: string;
+  prospectRole?: string;
+  prospectCompany?: string;
+  onStep?: (step: number, description: string) => void;
+}
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const SYSTEM_PROMPT = `You are an AI agent navigating a web product to create a compelling demo walkthrough.
+function buildSystemPrompt(opts: NavigationOptions): string {
+  const lang = opts.language || "en";
+  const langInstruction = lang !== "en"
+    ? `\nIMPORTANT: Write all descriptions and narrations in the language code "${lang}". The voiceover will be in this language.`
+    : "";
+
+  const personalization = opts.prospectName
+    ? `\nThe viewer is ${opts.prospectName}${opts.prospectRole ? `, ${opts.prospectRole}` : ""}${opts.prospectCompany ? ` at ${opts.prospectCompany}` : ""}. Tailor the narration to their role and mention their name occasionally.`
+    : "";
+
+  return `You are an AI agent navigating a web product to create a compelling demo walkthrough.
 You see a screenshot of the current page. Decide the SINGLE best next action to showcase the product.
 
 Respond ONLY with valid JSON (no markdown fences):
@@ -40,7 +59,8 @@ Rules:
 - Selectors should be specific (use data attributes, aria labels, or unique text content)
 - Prefer visible, above-the-fold interactive elements
 - Avoid clicking on external links, login forms, or cookie banners
-- Scroll down to reveal hidden content before clicking`;
+- Scroll down to reveal hidden content before clicking${langInstruction}${personalization}`;
+}
 
 async function screenshotToBase64(page: Page): Promise<string> {
   const buffer = await page.screenshot({ fullPage: false, type: "jpeg", quality: 80 });
@@ -48,6 +68,7 @@ async function screenshotToBase64(page: Page): Promise<string> {
 }
 
 async function askGPT4o(
+  systemPrompt: string,
   screenshotBase64: string,
   stepNumber: number,
   totalSteps: number
@@ -62,7 +83,7 @@ async function askGPT4o(
     model: "gpt-4o",
     max_tokens: 500,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
       {
         role: "user",
         content: [
@@ -74,10 +95,7 @@ async function askGPT4o(
           },
           {
             type: "image_url",
-            image_url: {
-              url: `data:image/jpeg;base64,${screenshotBase64}`,
-              detail: "low",
-            },
+            image_url: { url: `data:image/jpeg;base64,${screenshotBase64}`, detail: "low" },
           },
         ],
       },
@@ -89,23 +107,13 @@ async function askGPT4o(
   return JSON.parse(cleaned);
 }
 
-async function animateCursor(
-  page: Page,
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number
-) {
+async function animateCursor(page: Page, fromX: number, fromY: number, toX: number, toY: number) {
   const steps = 30;
-  const duration = 700;
-  const stepDelay = duration / steps;
-
+  const stepDelay = 700 / steps;
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const x = fromX + (toX - fromX) * ease;
-    const y = fromY + (toY - fromY) * ease;
-    await page.mouse.move(x, y);
+    await page.mouse.move(fromX + (toX - fromX) * ease, fromY + (toY - fromY) * ease);
     await page.waitForTimeout(stepDelay);
   }
 }
@@ -116,18 +124,11 @@ async function injectCursorOverlay(page: Page) {
     const cursor = document.createElement("div");
     cursor.id = "demopilot-cursor";
     Object.assign(cursor.style, {
-      position: "fixed",
-      top: "0px",
-      left: "0px",
-      width: "28px",
-      height: "28px",
-      zIndex: "999999",
-      pointerEvents: "none",
+      position: "fixed", top: "0", left: "0", width: "28px", height: "28px",
+      zIndex: "999999", pointerEvents: "none",
       filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
     });
-    cursor.innerHTML = `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6 3L22 14L14 15L10 23L6 3Z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
-    </svg>`;
+    cursor.innerHTML = `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 3L22 14L14 15L10 23L6 3Z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
     document.body.appendChild(cursor);
     document.addEventListener("mousemove", (e) => {
       cursor.style.left = e.clientX + "px";
@@ -138,12 +139,14 @@ async function injectCursorOverlay(page: Page) {
 
 export async function navigateAndCapture(
   targetUrl: string,
-  maxSteps = 6,
-  onStep?: (step: number, description: string) => void
+  opts: NavigationOptions = {}
 ): Promise<NavigationResult> {
+  const maxSteps = opts.maxSteps || 6;
   let browser: Browser | null = null;
   const tmpDir = path.join(os.tmpdir(), `demopilot-${Date.now()}`);
   fs.mkdirSync(tmpDir, { recursive: true });
+
+  const systemPrompt = buildSystemPrompt(opts);
 
   try {
     browser = await chromium.launch({
@@ -153,12 +156,8 @@ export async function navigateAndCapture(
 
     const context: BrowserContext = await browser.newContext({
       viewport: { width: 1280, height: 800 },
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      recordVideo: {
-        dir: tmpDir,
-        size: { width: 1280, height: 800 },
-      },
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      recordVideo: { dir: tmpDir, size: { width: 1280, height: 800 } },
     });
 
     const page = await context.newPage();
@@ -167,8 +166,7 @@ export async function navigateAndCapture(
     await page.waitForTimeout(1500);
     await injectCursorOverlay(page);
 
-    let cursorX = 640;
-    let cursorY = 400;
+    let cursorX = 640, cursorY = 400;
     await page.mouse.move(cursorX, cursorY);
     await page.waitForTimeout(500);
 
@@ -183,24 +181,14 @@ export async function navigateAndCapture(
 
       let gptResponse;
       try {
-        gptResponse = await askGPT4o(screenshotBase64, i, maxSteps);
+        gptResponse = await askGPT4o(systemPrompt, screenshotBase64, i, maxSteps);
       } catch {
-        gptResponse = {
-          action: "done" as const,
-          description: "Product overview page",
-          narration: "And that wraps up our quick tour of the product.",
-        };
+        gptResponse = { action: "done" as const, description: "Product overview", narration: "That wraps up our tour." };
       }
 
-      steps.push({
-        screenshot,
-        description: gptResponse.description,
-        narration: gptResponse.narration,
-        url: page.url(),
-        timestamp,
-      });
+      steps.push({ screenshot, description: gptResponse.description, narration: gptResponse.narration, url: page.url(), timestamp });
       narrations.push(gptResponse.narration);
-      onStep?.(i, gptResponse.description);
+      opts.onStep?.(i, gptResponse.description);
 
       if (gptResponse.action === "done") break;
 
@@ -208,26 +196,22 @@ export async function navigateAndCapture(
         switch (gptResponse.action) {
           case "click":
             if (gptResponse.selector) {
-              const element = await page.$(gptResponse.selector);
-              if (element) {
-                const box = await element.boundingBox();
+              const el = await page.$(gptResponse.selector);
+              if (el) {
+                const box = await el.boundingBox();
                 if (box) {
-                  const targetX = box.x + box.width / 2;
-                  const targetY = box.y + box.height / 2;
-                  await animateCursor(page, cursorX, cursorY, targetX, targetY);
-                  cursorX = targetX;
-                  cursorY = targetY;
+                  const tx = box.x + box.width / 2, ty = box.y + box.height / 2;
+                  await animateCursor(page, cursorX, cursorY, tx, ty);
+                  cursorX = tx; cursorY = ty;
                   await page.waitForTimeout(200);
-                  await element.click();
-                  await page.waitForTimeout(2500);
+                  await el.click();
                 } else {
                   await page.click(gptResponse.selector, { timeout: 5000 });
-                  await page.waitForTimeout(2500);
                 }
               } else {
                 await page.click(gptResponse.selector, { timeout: 5000 });
-                await page.waitForTimeout(2500);
               }
+              await page.waitForTimeout(2500);
               await injectCursorOverlay(page);
             }
             break;
@@ -242,49 +226,30 @@ export async function navigateAndCapture(
                 const box = await input.boundingBox();
                 if (box) {
                   await animateCursor(page, cursorX, cursorY, box.x + box.width / 2, box.y + box.height / 2);
-                  cursorX = box.x + box.width / 2;
-                  cursorY = box.y + box.height / 2;
+                  cursorX = box.x + box.width / 2; cursorY = box.y + box.height / 2;
                 }
               }
               await page.fill(gptResponse.selector, "");
-              for (const char of gptResponse.text) {
-                await page.keyboard.type(char, { delay: 80 });
-              }
+              for (const char of gptResponse.text) await page.keyboard.type(char, { delay: 80 });
               await page.waitForTimeout(1000);
             }
             break;
         }
-      } catch {
-        await page.waitForTimeout(1000);
-      }
+      } catch { await page.waitForTimeout(1000); }
     }
 
     await page.waitForTimeout(2000);
-
-    // Get the video path from Playwright's API — must call before page.close()
     const video = page.video();
     await page.close();
 
     let videoPath = "";
-    if (video) {
-      try {
-        videoPath = await video.path();
-      } catch {
-        // Video path may not be available
-      }
-    }
-
+    if (video) { try { videoPath = await video.path(); } catch { /* */ } }
     await context.close();
 
-    // Double-check: if video path is empty, look for webm files in tmpDir
     if (!videoPath || !fs.existsSync(/* turbopackIgnore: true */ videoPath)) {
-      const videoFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith(".webm"));
-      if (videoFiles.length > 0) {
-        videoPath = path.join(tmpDir, videoFiles[0]);
-      }
+      const files = fs.readdirSync(tmpDir).filter((f) => f.endsWith(".webm"));
+      if (files.length > 0) videoPath = path.join(tmpDir, files[0]);
     }
-
-    console.log(`[DemoPilot] Video recorded: ${videoPath} (exists: ${videoPath ? fs.existsSync(/* turbopackIgnore: true */ videoPath) : false})`);
 
     return { steps, narrations, videoPath };
   } finally {

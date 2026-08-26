@@ -68,6 +68,15 @@ export default function DemoViewer() {
         setDemo(data);
         if (data.script) setEditedScript(data.script);
         if (data.steps) setEditedSteps(data.steps);
+
+        // Track view
+        if (data.status === "done") {
+          fetch(`/api/demos/${id}/analytics`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event_type: "view", viewer_id: crypto.randomUUID() }),
+          }).catch(() => null);
+        }
       } catch {
         setDemo(null);
       } finally {
@@ -316,6 +325,21 @@ export default function DemoViewer() {
                     controls
                     muted={muted}
                     src={videoUrl}
+                    onPlay={() => {
+                      fetch(`/api/demos/${id}/analytics`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ event_type: "play" }),
+                      }).catch(() => null);
+                    }}
+                    onEnded={() => {
+                      const duration = videoRef.current?.duration || 0;
+                      fetch(`/api/demos/${id}/analytics`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ event_type: "complete", duration_seconds: Math.round(duration) }),
+                      }).catch(() => null);
+                    }}
                     onTimeUpdate={() => {
                       if (!videoRef.current || !displaySteps.length) return;
                       const time = videoRef.current.currentTime;
