@@ -13,20 +13,9 @@ export default function Hero({ onOpenAuth }: { onOpenAuth: () => void }) {
   const router = useRouter();
   const [launching, setLaunching] = useState(false);
 
-  async function handleTryDemo() {
+  function handleTryDemo() {
     setLaunching(true);
-    try {
-      const res = await fetch("/api/live/self-demo", { method: "POST" });
-      const { sessionId, error } = await res.json();
-      if (sessionId) {
-        router.push(`/live/${sessionId}`);
-      } else {
-        console.error("Self-demo error:", error);
-        setLaunching(false);
-      }
-    } catch {
-      setLaunching(false);
-    }
+    router.push("/demo/self");
   }
 
   // Animated cursor for the mock dashboard

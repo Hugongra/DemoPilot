@@ -3,48 +3,113 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const SYSTEM_PROMPT = `You are the AI demo agent for DemoPilot — an open-source platform for interactive product demos powered by AI.
+const SYSTEM_PROMPT = `You are a live product-demo agent controlling a real browser view of DemoPilot.
 
-You are currently giving a live demo of the DemoPilot platform itself. The user is watching you navigate the dashboard and they asked a question.
+The viewer can ask questions OR tell you to click, open, show, or go to parts of the UI. You must actually drive the UI when they ask.
 
-About DemoPilot:
-- Open-source agentic product demo platform for sales & marketing teams
-- AI agent navigates any product URL live, answers prospect questions in real time
-- Supports async video demos (MP4 with voiceover) and live interactive demos
-- Features: Sessions tracking, Analytics (views, completions, CTA clicks, leads), Knowledge Base (upload docs/FAQs/objection playbooks), Agents (multiple AI voices: Nova, Onyx, Alloy, Echo, Fable, Shimmer)
-- 50+ languages supported via OpenAI TTS
-- CRM webhooks (HubSpot, Salesforce, Zapier)
-- Prospect personalization (name, role, company)
-- Embeddable demos via iframe
-- Team workspaces with RBAC
-- Tech stack: Next.js 16, Supabase, Playwright, GPT-4o Vision, OpenAI TTS, FFmpeg
-- 100% open source, self-hostable, no per-seat pricing
-- Cost: ~$0.03 per demo (API costs only)
+Return JSON only:
+{
+  "reply": "short spoken reply in the viewer's language, 1-2 sentences",
+  "action": {
+    "type": "none" | "click" | "scroll" | "navigate",
+    "elementId": "id from the clickable list when type is click",
+    "url": "/ or /showcase when type is navigate",
+    "clickText": "optional visible label to click after navigate",
+    "scrollY": 700
+  }
+}
 
-Answer concisely (2-3 sentences max). Be enthusiastic but professional. You're speaking in a live call, so keep it natural and conversational.`;
+Rules:
+- If they ask to click / press / open / show / go to a control, you MUST return a UI action, not only talk.
+- Prefer type=click and an elementId that exists in the provided list. Match loosely across languages (e.g. "analíticas" → Analytics).
+- Dashboard tabs: Analytics, Sessions, Knowledge, Agents.
+- If they want the dashboard/platform and the current page is the landing page, navigate to /showcase. If they also named a tab, set clickText to that tab.
+- If they want the landing/home, navigate to "/".
+- "Try Demo" inside this demo should navigate to /showcase (the product), never /demo/self.
+- Features / How it works → click that nav link if present, otherwise scroll.
+- Get Started → click that button if present.
+- If they only asked a question with no UI intent, type=none.
+- Never invent elementIds that are not in the list.
+- Keep reply enthusiastic, natural, and in the viewer's language.
+
+About DemoPilot (for Q&A):
+Open-source AI product demos: live interactive demos, async MP4 walkthroughs, prospect personalization, knowledge base, analytics, AI voices, 50+ languages, embeddable player. Next.js, Playwright, GPT-4o Vision, OpenAI TTS. Self-hostable.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { message } = await req.json();
+    const { message, language, url, elements } = await req.json();
 
     if (!message?.trim()) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
     }
 
+    const lang = String(language || "en");
+    const elementList = Array.isArray(elements) ? elements.slice(0, 50) : [];
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_tokens: 150,
+      max_tokens: 250,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: message },
+        {
+          role: "user",
+          content: JSON.stringify({
+            viewerLanguage: lang,
+            currentUrl: url || "/",
+            clickableElements: elementList,
+            viewerSaid: message,
+          }),
+        },
       ],
     });
 
-    const reply = response.choices[0]?.message?.content?.trim() ?? "Sorry, I didn't catch that. Could you repeat?";
+    const raw = response.choices[0]?.message?.content?.trim() || "{}";
+    let parsed: {
+      reply?: string;
+      action?: {
+        type?: string;
+        elementId?: string;
+        url?: string;
+        clickText?: string;
+        scrollY?: number;
+      };
+    } = {};
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = { reply: raw };
+    }
 
-    return NextResponse.json({ reply });
+    const type = parsed.action?.type;
+    const action = {
+      type: type === "click" || type === "scroll" || type === "navigate" ? type : "none",
+      elementId: parsed.action?.elementId ? String(parsed.action.elementId) : undefined,
+      url: parsed.action?.url || undefined,
+      clickText: parsed.action?.clickText || undefined,
+      scrollY: typeof parsed.action?.scrollY === "number" ? parsed.action.scrollY : undefined,
+    };
+
+    if (action.type === "click" && action.elementId && !elementList.some((el: { id?: string }) => String(el.id) === action.elementId)) {
+      action.type = "none";
+      action.elementId = undefined;
+    }
+
+    const fallback =
+      lang.startsWith("es")
+        ? "Claro, dime qué quieres ver y lo abro."
+        : "Of course — tell me what you want to see and I'll open it.";
+
+    return NextResponse.json({
+      reply: parsed.reply?.trim() || fallback,
+      action,
+    });
   } catch (error) {
     console.error("Demo chat error:", error);
-    return NextResponse.json({ reply: "Let me get back to the demo — feel free to ask again!" }, { status: 200 });
+    return NextResponse.json({
+      reply: "Let me try that again — what should I click?",
+      action: { type: "none" },
+    });
   }
 }

@@ -105,7 +105,7 @@ const useCases = [
     label: "Convert",
     icon: BarChart3,
     title: "Track every interaction",
-    description: "See which demos convert, where prospects drop off, and push engagement data to your CRM automatically via webhooks.",
+    description: "See which demos convert, where prospects drop off, and which CTAs perform best — so you know what to improve.",
     mockContent: (
       <div className="flex h-full flex-col bg-white">
         <div className="border-b border-stone-200 px-6 py-3">
@@ -118,7 +118,7 @@ const useCases = [
               { label: "Demo Views", value: "2,847", change: "+23%" },
               { label: "Completion Rate", value: "74%", change: "+8%" },
               { label: "CTA Clicks", value: "421", change: "+31%" },
-              { label: "Leads Captured", value: "189", change: "+17%" },
+              { label: "Avg Duration", value: "4m 12s", change: "+6%" },
             ].map((m) => (
               <div key={m.label} className="rounded-lg border border-stone-200 p-3">
                 <div className="text-[10px] text-stone-400">{m.label}</div>
@@ -145,12 +145,6 @@ const useCases = [
                   <div className="w-8 text-[10px] font-medium text-stone-600">{s.pct}%</div>
                 </div>
               ))}
-            </div>
-          </div>
-          <div className="rounded-lg border border-stone-200 p-2">
-            <div className="flex items-center gap-2 text-[10px] text-stone-400">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Webhooks active: HubSpot &middot; Salesforce &middot; Slack
             </div>
           </div>
         </div>
@@ -217,7 +211,7 @@ export default function DemoPlayer() {
               <h3 className="text-lg font-semibold">{current.title}</h3>
               <p className="mt-1 max-w-lg text-sm text-muted-foreground">{current.description}</p>
             </div>
-            <a href="/live/new"
+            <a href="/demo/self"
               className="hidden sm:flex items-center gap-2 rounded-xl bg-foreground px-5 py-2.5 text-sm font-medium text-white transition-all hover:opacity-80">
               Try it now <ArrowRight className="h-4 w-4" />
             </a>

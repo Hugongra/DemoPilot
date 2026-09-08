@@ -32,7 +32,7 @@ export default function ShowcasePage() {
             <span className="ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">Open Source</span>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/live/new" className="flex items-center gap-1.5 rounded-lg bg-warm px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
+            <a href="/demo/self" className="flex items-center gap-1.5 rounded-lg bg-warm px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
               <Monitor className="h-3.5 w-3.5" /> New Live Demo
             </a>
             <button className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-50">

@@ -56,7 +56,7 @@ export default function Navbar({ onOpenAuth }: { onOpenAuth: () => void }) {
           <a href="#demo" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             How it works
           </a>
-          <a href="/live/new" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <a href="/demo/self" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Try Demo
           </a>
           <a
@@ -129,7 +129,7 @@ export default function Navbar({ onOpenAuth }: { onOpenAuth: () => void }) {
           <div className="flex flex-col gap-4">
             <a href="#features" className="text-sm text-muted-foreground" onClick={() => setMobileOpen(false)}>Features</a>
             <a href="#demo" className="text-sm text-muted-foreground" onClick={() => setMobileOpen(false)}>How it works</a>
-            <a href="/live/new" className="text-sm text-muted-foreground" onClick={() => setMobileOpen(false)}>Live Demo</a>
+            <a href="/demo/self" className="text-sm text-muted-foreground" onClick={() => setMobileOpen(false)}>Try Demo</a>
             <a href="https://github.com/Hugongra/DemoPilot" target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-muted-foreground" onClick={() => setMobileOpen(false)}>
               <GitBranch className="h-4 w-4" /> GitHub

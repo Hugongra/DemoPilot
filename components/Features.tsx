@@ -2,8 +2,8 @@
 
 import { motion } from "framer-motion";
 import {
-  Monitor, MessageSquare, BrainCircuit, Users, BarChart3, Languages,
-  Share2, Webhook, BookOpen, Film, UserCheck, Code2,
+  Monitor, MessageSquare, BrainCircuit, BarChart3, Languages,
+  Share2, BookOpen, Film, UserCheck, Code2, Mic,
 } from "lucide-react";
 
 const features = [
@@ -32,7 +32,7 @@ const features = [
     icon: MessageSquare,
     title: "Real-Time Q&A",
     description:
-      "Prospects type or speak questions during a live demo. The agent understands context, navigates to the answer, and responds with voice.",
+      "Prospects type questions during a live demo. The agent understands context, navigates to the answer, and responds with voice.",
     badge: "Sales",
   },
   {
@@ -57,11 +57,11 @@ const features = [
     badge: "Marketing",
   },
   {
-    icon: Webhook,
-    title: "CRM Webhooks",
+    icon: Mic,
+    title: "AI Voice Agents",
     description:
-      "Push demo events to HubSpot, Salesforce, or Zapier. Log leads automatically when prospects engage with your demos.",
-    badge: "Marketing",
+      "Six built-in OpenAI TTS voices — Nova, Onyx, Alloy, Echo, Fable, Shimmer — each tuned for different demo styles and audiences.",
+    badge: null,
   },
   {
     icon: Languages,
@@ -76,13 +76,6 @@ const features = [
     description:
       "One-click shareable links. Embed in your website, docs, or email sequences with a single iframe snippet. Auto-tracking included.",
     badge: "Marketing",
-  },
-  {
-    icon: Users,
-    title: "Team Workspaces",
-    description:
-      "RBAC roles for your sales team. Share demo templates, track team performance, and manage access across your organization.",
-    badge: null,
   },
   {
     icon: Code2,
@@ -125,7 +118,7 @@ export default function Features() {
           <motion.p initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.15 }}
             className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             Interactive live demos, async video walkthroughs, prospect personalization,
-            conversion analytics, CRM integration — all in one open-source platform.
+            and conversion analytics — all in one open-source platform.
           </motion.p>
         </div>
 
