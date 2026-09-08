@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getOpenAI } from "@/lib/openai";
 
 const HALLUCINATIONS = /^(thanks for watching\.?|thank you\.?|thanks\.?|gracias\.?|gracias por ver\.?|subscribe\.?|music\.?|\[.*\]|\(.*\))$/i;
 
@@ -21,7 +19,7 @@ export async function POST(req: NextRequest) {
       : `DemoPilot product demo. The user asks to click or show UI. Words: DemoPilot, Analytics, Sessions, Knowledge, Agents, Try Demo, Get Started, Features, dashboard.${hint ? ` Possible transcript: ${hint}` : ""}`;
 
     const run = async (model: "gpt-4o-mini-transcribe" | "whisper-1") => {
-      return openai.audio.transcriptions.create({
+      return getOpenAI().audio.transcriptions.create({
         model,
         file: audioFile,
         ...(language ? { language } : {}),

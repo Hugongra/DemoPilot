@@ -1,8 +1,8 @@
 import { chromium, type Page, type Browser, type BrowserContext } from "playwright";
-import OpenAI from "openai";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { getOpenAI } from "@/lib/openai";
 
 export interface NavStep {
   screenshot: Buffer;
@@ -26,8 +26,6 @@ export interface NavigationOptions {
   prospectCompany?: string;
   onStep?: (step: number, description: string) => void;
 }
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildSystemPrompt(opts: NavigationOptions): string {
   const lang = opts.language || "en";
@@ -79,7 +77,7 @@ async function askGPT4o(
   description: string;
   narration: string;
 }> {
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     max_tokens: 500,
     messages: [

@@ -1,7 +1,5 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getOpenAI } from "@/lib/openai";
 
 export interface LiveSession {
   id: string;
@@ -116,7 +114,7 @@ export async function createLiveSession(opts: {
 
 async function streamTTS(session: LiveSession, text: string) {
   try {
-    const ttsResponse = await openai.audio.speech.create({
+    const ttsResponse = await getOpenAI().audio.speech.create({
       model: "tts-1",
       voice: "nova",
       input: text,
@@ -201,7 +199,7 @@ async function processViewerIntent(
   }
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       max_tokens: 300,
       messages: [
@@ -257,7 +255,7 @@ async function generateAgentResponse(session: LiveSession, prompt: string): Prom
   }
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       max_tokens: 200,
       messages: [

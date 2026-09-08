@@ -1,6 +1,4 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getOpenAI } from "@/lib/openai";
 
 const LANG_NAMES: Record<string, string> = {
   en: "English", es: "Spanish", fr: "French", de: "German", pt: "Portuguese",
@@ -30,7 +28,7 @@ export async function generateScript(
   const langName = LANG_NAMES[language] || "English";
   const personalization = prospectName ? `Address the viewer as ${prospectName} at least once.` : "";
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     max_tokens: 1000,
     messages: [
@@ -58,7 +56,7 @@ const LANG_VOICES: Record<string, TTSVoice> = {
 export async function generateAudio(script: string, language = "en"): Promise<Buffer> {
   const voice = LANG_VOICES[language] || "nova";
 
-  const response = await openai.audio.speech.create({
+  const response = await getOpenAI().audio.speech.create({
     model: "tts-1-hd",
     voice,
     input: script,

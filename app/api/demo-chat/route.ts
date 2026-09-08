@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getOpenAI } from "@/lib/openai";
 
 const SYSTEM_PROMPT = `You are a live product-demo agent controlling a real browser view of DemoPilot.
 
@@ -46,7 +44,7 @@ export async function POST(req: NextRequest) {
     const lang = String(language || "en");
     const elementList = Array.isArray(elements) ? elements.slice(0, 50) : [];
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 250,
       temperature: 0.2,
