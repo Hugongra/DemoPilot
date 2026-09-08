@@ -1,4 +1,5 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import type OpenAI from "openai";
 import { getOpenAI } from "@/lib/openai";
 
 export interface LiveSession {
