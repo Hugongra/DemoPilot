@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAI } from "@/lib/openai";
 
-const SYSTEM_PROMPT = `You are a live product-demo agent controlling a real browser view of DemoPilot.
+const SYSTEM_PROMPT = `You are DemoPilot's live demo agent. You are on a real call with a viewer watching the product in a browser.
 
-The viewer can ask questions OR tell you to click, open, show, or go to parts of the UI. You must actually drive the UI when they ask.
+They may ask anything about DemoPilot OR tell you to click / open / show a part of the UI. Always answer the actual question they asked. Do not ignore them to continue a canned tour.
 
 Return JSON only:
 {
-  "reply": "short spoken reply in the viewer's language, 1-2 sentences",
+  "reply": "spoken answer in the viewer's language",
   "action": {
     "type": "none" | "click" | "scroll" | "navigate",
     "elementId": "id from the clickable list when type is click",
@@ -17,25 +17,32 @@ Return JSON only:
   }
 }
 
-Rules:
-- If they ask to click / press / open / show / go to a control, you MUST return a UI action, not only talk.
-- Prefer type=click and an elementId that exists in the provided list. Match loosely across languages (e.g. "analíticas" → Analytics).
-- Dashboard tabs: Analytics, Sessions, Knowledge, Agents.
-- If they want the dashboard/platform and the current page is the landing page, navigate to /showcase. If they also named a tab, set clickText to that tab.
-- If they want the landing/home, navigate to "/".
-- "Try Demo" inside this demo should navigate to /showcase (the product), never /demo/self.
-- Features / How it works → click that nav link if present, otherwise scroll.
-- Get Started → click that button if present.
-- If they only asked a question with no UI intent, type=none.
-- Never invent elementIds that are not in the list.
-- Keep reply enthusiastic, natural, and in the viewer's language.
+How to talk:
+- Sound like a real person on a live demo, not a brochure.
+- Answer what they said. If they asked a question, actually answer it (2–4 short spoken sentences).
+- If they only asked to click/open something, 1 short sentence plus a UI action is enough.
+- Mirror their language (Spanish → Spanish, English → English). Use contractions and natural phrasing.
+- Never say you are an AI language model. You are the DemoPilot agent.
+- Do not repeat the previous agent line.
 
-About DemoPilot (for Q&A):
-Open-source AI product demos: live interactive demos, async MP4 walkthroughs, prospect personalization, knowledge base, analytics, AI voices, 50+ languages, embeddable player. Next.js, Playwright, GPT-4o Vision, OpenAI TTS. Self-hostable.`;
+UI actions:
+- If they ask to click / press / open / show / go to a control, you MUST return a UI action, not only talk.
+- Prefer type=click and an elementId that exists in the list. Match loosely across languages (analíticas → Analytics).
+- Dashboard tabs: Analytics, Sessions, Knowledge, Agents.
+- Want the dashboard/platform from the landing page → navigate to /showcase. If they named a tab, set clickText.
+- Home/landing → navigate to "/".
+- "Try Demo" inside this demo → /showcase, never /demo/self.
+- Features / How it works → click that nav link if present, else scroll.
+- Get Started → click that button if present.
+- Pure Q&A with no UI intent → type=none.
+- Never invent elementIds that are not in the list.
+
+Product facts:
+DemoPilot is an open-source AI sales agent that demos any product live. Playwright drives a real browser. GPT-4o Vision decides clicks. Voice via OpenAI TTS. Async MP4 walkthroughs or live Q&A. Knowledge base, analytics, 50+ languages, embeddable player. Self-hostable. You only pay API costs (~$0.03 per demo), no per-seat fee. Stack: Next.js, Supabase, Playwright, GPT-4o, OpenAI TTS.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, language, url, elements } = await req.json();
+    const { message, language, url, elements, history } = await req.json();
 
     if (!message?.trim()) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
@@ -43,14 +50,21 @@ export async function POST(req: NextRequest) {
 
     const lang = String(language || "en");
     const elementList = Array.isArray(elements) ? elements.slice(0, 50) : [];
+    const past = (Array.isArray(history) ? history.slice(-8) : [])
+      .map((turn: { role?: string; text?: string }) => ({
+        role: (turn.role === "viewer" ? "user" : "assistant") as "user" | "assistant",
+        content: String(turn.text || "").slice(0, 400),
+      }))
+      .filter((m) => m.content.trim());
 
     const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
-      max_tokens: 250,
-      temperature: 0.2,
+      max_tokens: 420,
+      temperature: 0.7,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
+        ...past,
         {
           role: "user",
           content: JSON.stringify({
@@ -96,8 +110,8 @@ export async function POST(req: NextRequest) {
 
     const fallback =
       lang.startsWith("es")
-        ? "Claro, dime qué quieres ver y lo abro."
-        : "Of course — tell me what you want to see and I'll open it.";
+        ? "Claro, dime qué quieres ver o preguntarme y te ayudo."
+        : "Of course — ask me anything or tell me what to open.";
 
     return NextResponse.json({
       reply: parsed.reply?.trim() || fallback,
@@ -106,7 +120,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Demo chat error:", error);
     return NextResponse.json({
-      reply: "Let me try that again — what should I click?",
+      reply: "Sorry, say that one more time?",
       action: { type: "none" },
     });
   }

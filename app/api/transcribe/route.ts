@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = language === "es"
-      ? `DemoPilot. El usuario habla en español y pide ver o clicar partes del producto. Palabras: DemoPilot, Analytics, Sessions, Knowledge, Agents, Try Demo, Get Started, Features, dashboard, clica, pulsa, abre, muestra.${hint ? ` Posible texto: ${hint}` : ""}`
-      : `DemoPilot product demo. The user asks to click or show UI. Words: DemoPilot, Analytics, Sessions, Knowledge, Agents, Try Demo, Get Started, Features, dashboard.${hint ? ` Possible transcript: ${hint}` : ""}`;
+      ? `Conversación en español con el agente de DemoPilot. El usuario pregunta sobre el producto o pide ver pestañas: Analytics, Sessions, Knowledge, Agents, Try Demo, Features, dashboard. Palabras: DemoPilot, clica, abre, muestra, cuánto cuesta, open source.${hint ? ` Posible texto: ${hint}` : ""}`
+      : `Spoken question to the DemoPilot demo agent. The user may ask about the product or ask to open Analytics, Sessions, Knowledge, Agents, Try Demo, Features. Words: DemoPilot, pricing, open source, dashboard.${hint ? ` Possible transcript: ${hint}` : ""}`;
 
     const run = async (model: "gpt-4o-mini-transcribe" | "whisper-1") => {
       return getOpenAI().audio.transcriptions.create({

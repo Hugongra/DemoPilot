@@ -8,7 +8,7 @@ import {
   Languages, User2, ChevronDown, Eye, BarChart3, BookOpen, Bot,
   TrendingUp, MousePointerClick, FileText, Link2,
   Shield, MessageSquare, Volume2, Upload, Save, Signal,
-  Settings, FlaskConical, GitBranch, Columns3,
+  Settings, Columns3, Monitor,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
@@ -139,14 +139,11 @@ function getDuration(demo: Demo): string {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
-const NAV_ITEMS: Array<{ id: Tab; label: string; icon: React.ReactNode; soon?: boolean }> = [
-  { id: "analytics", label: "Analytics", icon: <BarChart3 className="h-[18px] w-[18px]" /> },
-  { id: "sessions", label: "Sessions", icon: <Play className="h-[18px] w-[18px]" /> },
-  { id: "agents", label: "Agents", icon: <Bot className="h-[18px] w-[18px]" /> },
-  { id: "knowledge", label: "Knowledge", icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { id: "integrations", label: "Integrations", icon: <Settings className="h-[18px] w-[18px]" />, soon: true },
-  { id: "ab_testing", label: "AB testing", icon: <FlaskConical className="h-[18px] w-[18px]" />, soon: true },
-  { id: "routing", label: "Routing", icon: <GitBranch className="h-[18px] w-[18px]" />, soon: true },
+const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
+  { id: "analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> },
+  { id: "sessions", label: "Sessions", icon: <Play className="h-4 w-4" /> },
+  { id: "knowledge", label: "Knowledge", icon: <BookOpen className="h-4 w-4" /> },
+  { id: "agents", label: "Agents", icon: <Bot className="h-4 w-4" /> },
 ];
 
 export default function Dashboard() {
@@ -391,127 +388,66 @@ export default function Dashboard() {
   const avgCompletionRate = analyticsData.length > 0
     ? analyticsData.reduce((s, d) => s + (d.analytics?.completionRate || 0), 0) / analyticsData.length : 0;
 
-  const sectionTitle: Record<Tab, { title: string; subtitle: string }> = {
-    analytics: { title: "Analytics", subtitle: "Track the performance and usage of your agents." },
-    sessions: { title: "Sessions", subtitle: "All demo sessions across every agent." },
-    agents: { title: "Agents", subtitle: "Configure AI voices and custom agent personalities." },
-    knowledge: { title: "Knowledge", subtitle: "Upload docs or URLs to give your agents product context." },
-    integrations: { title: "Integrations", subtitle: "Connect CRM, analytics, and third-party tools." },
-    ab_testing: { title: "AB testing", subtitle: "Test different agent scripts and measure performance." },
-    routing: { title: "Routing", subtitle: "Route prospects to the right agent automatically." },
-  };
-
   return (
-    <div className="flex h-screen bg-white">
-      {/* ── SIDEBAR ── */}
-      <aside className="flex w-56 flex-col border-r border-stone-200 bg-white">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-900">
-            <Play className="h-3.5 w-3.5 fill-white text-white" />
-          </div>
-          <span className="text-[15px] font-bold tracking-tight">DemoPilot</span>
-        </div>
-
-        {/* Workspace */}
-        <div className="mx-4 mb-4 flex items-center gap-2.5 rounded-lg border border-stone-200 px-3 py-2.5">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-7 w-7 rounded-full" />
-          ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-stone-900 text-[10px] font-bold text-white">
-              {displayName.charAt(0).toUpperCase()}
+    <div className="min-h-screen bg-stone-50" data-testid="demopilot-dashboard">
+      <nav className="border-b border-stone-200 bg-white">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+          <div className="flex items-center gap-2 text-sm font-bold tracking-tight">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-stone-900">
+              <Play className="h-3.5 w-3.5 fill-white text-white" />
             </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold leading-tight">{displayName}</p>
-            <p className="text-[11px] text-stone-400">Open source</p>
+            DemoPilot
+            <span className="ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">Open Source</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="/demo/self" className="flex items-center gap-1.5 rounded-lg bg-warm px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
+              <Monitor className="h-3.5 w-3.5" /> New Live Demo
+            </a>
+            <a href="/dashboard/settings" className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-50">
+              <Settings className="h-3.5 w-3.5" /> Settings
+            </a>
+            <button onClick={handleSignOut} className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-50">
+              <LogOut className="h-3.5 w-3.5" /> Sign out
+            </button>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="h-8 w-8 rounded-full" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warm text-xs font-bold text-white">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </div>
+      </nav>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-0.5 px-3">
-          {NAV_ITEMS.map((item) => (
+      <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mb-6 flex items-center gap-1 rounded-xl border border-stone-200 bg-white p-1" data-testid="tab-bar">
+          {TABS.map((tab) => (
             <button
-              key={item.id}
-              onClick={() => !item.soon && setActiveTab(item.id)}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
-                activeTab === item.id
-                  ? "bg-stone-100 text-stone-900"
-                  : item.soon
-                    ? "cursor-default text-stone-300"
-                    : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              data-testid={`tab-${tab.id}`}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                activeTab === tab.id ? "bg-stone-900 text-white shadow-sm" : "text-stone-500 hover:bg-stone-50 hover:text-stone-900"
               }`}
             >
-              {item.icon}
-              {item.label}
-              {item.soon && <span className="ml-auto rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-semibold text-stone-400">SOON</span>}
+              {tab.icon} {tab.label}
             </button>
           ))}
-        </nav>
-
-        {/* Bottom */}
-        <div className="border-t border-stone-200 px-4 py-3">
-          <button onClick={handleSignOut}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600">
-            <LogOut className="h-4 w-4" /> Sign out
-          </button>
         </div>
-      </aside>
-
-      {/* ── MAIN CONTENT ── */}
-      <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Content header */}
-        <header className="flex items-start justify-between border-b border-stone-200 px-8 py-6">
-          <div>
-            <h1 className="text-xl font-semibold text-stone-900">{sectionTitle[activeTab].title}</h1>
-            <p className="mt-0.5 text-[13px] text-stone-400">{sectionTitle[activeTab].subtitle}</p>
-          </div>
-          {activeTab === "sessions" && (
-            <button onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-stone-800">
-              <Plus className="h-3.5 w-3.5" /> New session
-            </button>
-          )}
-          {activeTab === "knowledge" && (
-            <div className="flex items-center gap-2">
-              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2 text-[13px] font-medium text-stone-600 transition-all hover:bg-stone-50 ${uploadingFile ? "opacity-50 pointer-events-none" : ""}`}>
-                {uploadingFile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                Upload File
-                <input type="file" className="hidden" accept=".txt,.md,.csv,.json,.html,.htm,.xml,.log,.rtf,.yaml,.yml,.toml,.ini,.cfg,.env,.jsx,.tsx,.js,.ts,.py,.rb,.java,.css,.scss,.sql" onChange={handleFileUpload} />
-              </label>
-              <button onClick={() => setShowAddKnowledge(!showAddKnowledge)}
-                className="flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-stone-800">
-                <Plus className="h-3.5 w-3.5" /> Add manually
-              </button>
-            </div>
-          )}
-          {activeTab === "analytics" && (
-            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-1.5 rounded-md border border-stone-200 px-3 py-1.5 text-[12px] font-medium text-stone-500 hover:bg-stone-50">
-                All projects <ChevronDown className="h-3 w-3" />
-              </button>
-              <button className="flex items-center gap-1.5 rounded-md border border-stone-200 px-3 py-1.5 text-[12px] font-medium text-stone-500 hover:bg-stone-50">
-                Last 30 days <ChevronDown className="h-3 w-3" />
-              </button>
-              <button className="flex items-center gap-1.5 rounded-md border border-stone-200 px-3 py-1.5 text-[12px] font-medium text-stone-500 hover:bg-stone-50">
-                Daily <ChevronDown className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-          {activeTab === "agents" && (
-            <button onClick={() => setShowCreateAgent(!showCreateAgent)}
-              className="flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-stone-800">
-              <Plus className="h-3.5 w-3.5" /> Create Agent
-            </button>
-          )}
-        </header>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
 
           {/* ── SESSIONS ── */}
           {activeTab === "sessions" && (
-            <div>
+            <div data-testid="sessions-panel">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-stone-900">Sessions</h2>
+                <p className="mt-1 text-sm text-stone-500">All demo sessions across every agent</p>
+              </div>
+              <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white hover:opacity-80">
+                <Plus className="h-4 w-4" /> New Demo
+              </button>
+            </div>
               {showCreate && (
                 <div className="border-b border-stone-200 bg-stone-50 px-8 py-5">
                   <h3 className="mb-3 text-[13px] font-semibold">Create a new demo session</h3>
@@ -566,28 +502,55 @@ export default function Dashboard() {
               </div>
 
               {demos.length === 0 && !showCreate ? (
-                <div className="flex flex-col items-center justify-center py-32 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100">
-                    <Film className="h-7 w-7 text-stone-300" />
-                  </div>
-                  <h3 className="mb-1 text-lg font-medium text-stone-600">No sessions yet</h3>
-                  <p className="mb-6 text-[13px] text-stone-400">Create your first AI-powered product demo</p>
-                  <button onClick={() => setShowCreate(true)}
-                    className="flex items-center gap-2 rounded-lg bg-stone-900 px-5 py-2.5 text-[13px] font-medium text-white hover:bg-stone-800">
-                    <Plus className="h-3.5 w-3.5" /> New session
-                  </button>
+                <div className="rounded-xl border border-stone-200 bg-white" data-testid="sessions-table">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-100 text-xs text-stone-400">
+                        <th className="px-5 py-3 text-left font-medium">Visitor</th>
+                        <th className="px-3 py-3 text-left font-medium">Agent</th>
+                        <th className="px-3 py-3 text-left font-medium">Use case</th>
+                        <th className="px-3 py-3 text-left font-medium">Status</th>
+                        <th className="px-3 py-3 text-left font-medium">Duration</th>
+                        <th className="px-3 py-3 text-left font-medium">Started</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { name: "Sarah Chen", email: "sarah@stripe.com", agent: "Landing page", uc: "Marketing", ucColor: "bg-purple-100 text-purple-700", status: "Completed", dur: "41m 29s", time: "9m ago" },
+                        { name: "Omar Bennett", email: "omar@slack.com", agent: "ABM New Hires", uc: "Sales", ucColor: "bg-orange-100 text-orange-700", status: "Completed", dur: "41m 28s", time: "34m ago" },
+                        { name: "Priya Costa", email: "priya@cloudline.co", agent: "Blog", uc: "Marketing", ucColor: "bg-purple-100 text-purple-700", status: "Completed", dur: "41m 27s", time: "58m ago" },
+                        { name: "Sofia Novak", email: "sofia@northwind.com", agent: "Copilot US", uc: "Sales", ucColor: "bg-orange-100 text-orange-700", status: "Completed", dur: "7m 29s", time: "1h ago" },
+                        { name: "Zoe Mercer", email: "zoe@datapulse.io", agent: "In-App", uc: "Success", ucColor: "bg-emerald-100 text-emerald-700", status: "Completed", dur: "41m 26s", time: "2h ago" },
+                        { name: "Liam Vance", email: "liam@stackform.com", agent: "Copilot EMEA", uc: "Sales", ucColor: "bg-orange-100 text-orange-700", status: "Completed", dur: "6m 30s", time: "2h ago" },
+                        { name: "Grace Okafor", email: "grace@brightpath.io", agent: "Landing page", uc: "Marketing", ucColor: "bg-purple-100 text-purple-700", status: "Completed", dur: "41m 25s", time: "3h ago" },
+                        { name: "Ravi Park", email: "ravi@heliosys.com", agent: "Blog", uc: "Marketing", ucColor: "bg-purple-100 text-purple-700", status: "Completed", dur: "41m 24s", time: "4h ago" },
+                        { name: "Diego Doyle", email: "diego@cloudline.co", agent: "Copilot US", uc: "Sales", ucColor: "bg-orange-100 text-orange-700", status: "Completed", dur: "36m 48s", time: "5h ago" },
+                        { name: "Noah Reed", email: "noah@northwind.com", agent: "In-App", uc: "Success", ucColor: "bg-emerald-100 text-emerald-700", status: "Completed", dur: "50m 53s", time: "6h ago" },
+                      ].map((r) => (
+                        <tr key={r.name + r.time} className="border-b border-stone-50 hover:bg-stone-50">
+                          <td className="px-5 py-3"><div className="font-medium text-stone-800">{r.name}</div><div className="text-xs text-stone-400">{r.email}</div></td>
+                          <td className="px-3 py-3 text-stone-600">{r.agent}</td>
+                          <td className="px-3 py-3"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${r.ucColor}`}>{r.uc}</span></td>
+                          <td className="px-3 py-3"><span className="flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />{r.status}</span></td>
+                          <td className="px-3 py-3 text-stone-500">{r.dur}</td>
+                          <td className="px-3 py-3 text-stone-400">{r.time}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : demos.length > 0 && (
-                <table className="w-full text-[13px]">
+                <div className="rounded-xl border border-stone-200 bg-white" data-testid="sessions-table">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-stone-100 text-[11px] uppercase tracking-wider text-stone-400">
+                    <tr className="border-b border-stone-100 text-xs text-stone-400">
                       <th className="w-8 px-2 py-3"></th>
-                      <th className="px-4 py-3 text-left font-medium">Visitor</th>
-                      <th className="px-4 py-3 text-left font-medium">Agent</th>
-                      <th className="px-4 py-3 text-left font-medium">Use case</th>
-                      <th className="px-4 py-3 text-left font-medium">Status</th>
-                      <th className="px-4 py-3 text-left font-medium">Duration</th>
-                      <th className="px-4 py-3 text-left font-medium">Started</th>
+                      <th className="px-5 py-3 text-left font-medium">Visitor</th>
+                      <th className="px-3 py-3 text-left font-medium">Agent</th>
+                      <th className="px-3 py-3 text-left font-medium">Use case</th>
+                      <th className="px-3 py-3 text-left font-medium">Status</th>
+                      <th className="px-3 py-3 text-left font-medium">Duration</th>
+                      <th className="px-3 py-3 text-left font-medium">Started</th>
                       <th className="w-10 px-2 py-3"></th>
                     </tr>
                   </thead>
@@ -666,6 +629,7 @@ export default function Dashboard() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}
@@ -673,10 +637,6 @@ export default function Dashboard() {
           {/* ── ANALYTICS ── */}
           {activeTab === "analytics" && (() => {
             const hasData = analyticsData.length > 0;
-            const demoCount = hasData ? analyticsData.length : 0;
-            const totalDuration = hasData ? analyticsData.reduce((s, d) => s + (d.analytics?.avgDuration || 0), 0) : 0;
-            const durationH = Math.floor(totalDuration / 3600);
-            const durationM = Math.floor((totalDuration % 3600) / 60);
             const conversionRate = hasData && totalViews > 0 ? Math.round((totalCtaClicks / totalViews) * 100) : 0;
 
             const chartBars = hasData
@@ -689,127 +649,62 @@ export default function Dashboard() {
                   { demos: 20, goals: 8, label: "Aug 25" }, { demos: 28, goals: 11, label: "Aug 28" },
                 ];
             const chartMax = Math.max(...chartBars.map((b) => b.demos), 1);
-            const yTicks = [0, Math.round(chartMax * 0.25), Math.round(chartMax * 0.5), Math.round(chartMax * 0.75), chartMax];
 
             return (
-              <div className="px-8 py-6 space-y-6">
+              <div data-testid="analytics-panel">
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold text-stone-900">Analytics</h2>
+                  <p className="mt-1 text-sm text-stone-500">Conversion rates and engagement across all product demos</p>
+                </div>
                 {analyticsLoading ? (
                   <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-stone-400" /></div>
                 ) : (
                   <>
-                    {/* Stat cards */}
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-5 mb-6">
                       {[
-                        { label: "Total Demo Sessions", value: hasData ? demoCount.toLocaleString() : "0", sub: hasData ? "Sessions in last 30 days" : "No sessions yet", trend: hasData ? "+13.6%" : null },
-                        { label: "Total Demo Minutes", value: hasData ? `${durationH}h ${durationM}m` : "0h 0m", sub: hasData ? "Total time spent in demos" : "No data yet", trend: hasData ? "+18.1%" : null },
-                        { label: "Goals Reached", value: hasData ? totalCtaClicks.toLocaleString() : "0", sub: hasData ? "Demo goals successfully achieved" : "CTA clicks across demos", trend: hasData ? "+11.1%" : null },
-                        { label: "Conversion Rate", value: hasData ? `${conversionRate}%` : "0%", sub: hasData ? "Demos started per page view" : "Views to CTA ratio", trend: hasData ? "+8.3%" : null },
-                        { label: "Completion Rate", value: `${Math.round(avgCompletionRate)}%`, sub: hasData ? `${totalCompletes} of ${totalPlays} demos completed` : "Avg demo completion", trend: hasData ? "+2.1%" : null },
+                        { label: "Total Views", value: hasData ? totalViews.toLocaleString() : "2,847", icon: Eye, color: "text-blue-600 bg-blue-50" },
+                        { label: "Total Plays", value: hasData ? totalPlays.toLocaleString() : "1,923", icon: Play, color: "text-purple-600 bg-purple-50" },
+                        { label: "Completions", value: hasData ? totalCompletes.toLocaleString() : "1,421", icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50" },
+                        { label: "CTA Clicks", value: hasData ? totalCtaClicks.toLocaleString() : "421", icon: ExternalLink, color: "text-warm bg-warm/10" },
+                        { label: "Avg Completion", value: hasData ? `${Math.round(avgCompletionRate)}%` : "74%", icon: BarChart3, color: "text-indigo-600 bg-indigo-50" },
                       ].map((stat) => (
-                        <div key={stat.label} className="rounded-xl border border-stone-200 p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-[11px] font-medium text-stone-400">{stat.label}</p>
-                            {stat.trend && <span className="text-[10px] font-medium text-emerald-600">{stat.trend}</span>}
+                        <div key={stat.label} className="rounded-xl border border-stone-200 bg-white p-4">
+                          <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg ${stat.color}`}>
+                            <stat.icon className="h-4 w-4" />
                           </div>
-                          <p className="text-[22px] font-bold text-stone-900 leading-tight">{stat.value}</p>
-                          <p className="mt-1 text-[11px] text-stone-400">{stat.sub}</p>
+                          <p className="text-2xl font-semibold text-stone-900">{stat.value}</p>
+                          <p className="text-xs text-stone-500">{stat.label}</p>
                         </div>
                       ))}
                     </div>
-
-                    {/* Activity section */}
-                    <div>
-                      <h2 className="mb-1 text-[15px] font-semibold text-stone-900">Activity</h2>
-                      <p className="mb-5 text-[12px] text-stone-400">Demo volume over time and how visitors move toward the goal.</p>
-
-                      {/* Activity Over Time chart */}
-                      <div className="rounded-xl border border-stone-200 p-5">
-                        <div className="mb-4 flex items-center justify-between">
-                          <div>
-                            <h3 className="text-[13px] font-semibold text-stone-900">Activity Over Time</h3>
-                            <div className="mt-2 flex items-center gap-5">
-                              <span className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span className="h-2 w-2 rounded-full bg-emerald-400"></span> Demos <span className="font-semibold text-stone-900">{hasData ? demoCount : 22}</span>
-                              </span>
-                              <span className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span className="h-2 w-2 rounded-full bg-red-400"></span> Errors <span className="font-semibold text-stone-900">{hasData ? demos.filter((d) => d.status === "error").length : 1}</span>
-                              </span>
-                              <span className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span className="h-2 w-2 rounded-full bg-blue-400"></span> Avg Duration <span className="font-semibold text-stone-900">{hasData && totalDuration > 0 ? `${Math.round(totalDuration / Math.max(demoCount, 1))}s` : "8m"}</span>
-                              </span>
-                              <span className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span className="h-2 w-2 rounded-full bg-purple-400"></span> Goals Reached <span className="font-semibold text-stone-900">{hasData ? totalCtaClicks : 9}</span>
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Chart */}
-                        <div className="flex">
-                          {/* Y axis labels */}
-                          <div className="flex flex-col-reverse justify-between pr-3 py-1" style={{ height: 200 }}>
-                            {yTicks.map((t) => (
-                              <span key={t} className="text-[10px] text-stone-400 leading-none">{t}</span>
-                            ))}
-                          </div>
-                          {/* Bars */}
-                          <div className="flex-1 border-l border-b border-stone-200">
-                            <div className="flex items-end gap-1 px-1" style={{ height: 200 }}>
-                              {chartBars.map((bar, i) => {
-                                const barH = chartMax > 0 ? (bar.demos / chartMax) * 100 : 0;
-                                const goalH = chartMax > 0 ? (bar.goals / chartMax) * 100 : 0;
-                                return (
-                                  <div key={i} className="group relative flex flex-1 items-end justify-center gap-0.5">
-                                    <div className={`w-full max-w-[18px] rounded-t ${hasData ? "bg-emerald-400/70" : "bg-stone-300/50"}`} style={{ height: `${Math.max(barH, 2)}%` }} />
-                                    <div className={`w-full max-w-[18px] rounded-t ${hasData ? "bg-purple-400/70" : "bg-stone-200/50"}`} style={{ height: `${Math.max(goalH, 2)}%` }} />
-                                    {/* Tooltip */}
-                                    <div className="pointer-events-none absolute -top-14 left-1/2 z-10 hidden -translate-x-1/2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-[11px] shadow-lg group-hover:block">
-                                      <p className="font-semibold text-stone-700 mb-1">{bar.label}</p>
-                                      <p className="text-stone-500">Demos: <span className="font-medium text-stone-800">{bar.demos}</span></p>
-                                      <p className="text-stone-500">Goals: <span className="font-medium text-stone-800">{bar.goals}</span></p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {/* X axis labels */}
-                            <div className="flex border-t border-stone-100 px-1 pt-2">
-                              {chartBars.map((bar, i) => (
-                                <div key={i} className="flex-1 text-center text-[9px] text-stone-400">{bar.label}</div>
-                              ))}
-                            </div>
-                          </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-xl border border-stone-200 bg-white p-5">
+                        <h3 className="mb-3 text-sm font-semibold text-stone-900">Engagement over time</h3>
+                        <div className="flex h-40 items-end gap-1.5">
+                          {(hasData ? chartBars.map((b) => Math.max(8, Math.round((b.demos / chartMax) * 100))) : [40, 65, 45, 80, 60, 90, 70, 85, 55, 75, 50, 88, 62, 78, 92, 68, 83]).map((h, i) => (
+                            <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-warm/60 to-warm/20" style={{ height: `${h}%` }} />
+                          ))}
                         </div>
                       </div>
-                    </div>
-
-                    {/* Conversion chart */}
-                    <div className="rounded-xl border border-stone-200 p-5">
-                      <div className="mb-4 flex items-center justify-between">
-                        <div>
-                          <h3 className="text-[13px] font-semibold text-stone-900">Conversion Chart</h3>
-                          <p className="mt-0.5 text-[11px] text-stone-400">
-                            {hasData ? `${conversionRate}% conversion · ${totalCtaClicks} goals reached · ${totalCompletes} completed` : "35.4% conversion · 37 rejected emails · 22 goals reached"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        {[
-                          { label: "Viewed", value: hasData ? totalViews : 100, pct: 100 },
-                          { label: "Started playing", value: hasData ? totalPlays : 82, pct: hasData ? (totalViews > 0 ? Math.round((totalPlays / totalViews) * 100) : 0) : 82 },
-                          { label: "Completed demo", value: hasData ? totalCompletes : 44, pct: hasData ? Math.round(avgCompletionRate) : 44 },
-                          { label: "CTA clicked", value: hasData ? totalCtaClicks : 22, pct: hasData ? conversionRate : 22 },
-                        ].map((step) => (
-                          <div key={step.label} className="flex items-center gap-4">
-                            <div className="w-28 text-right text-[12px] text-stone-500">{step.label}</div>
-                            <div className="flex-1 h-7 rounded bg-stone-100 overflow-hidden relative">
-                              <div className={`h-full rounded ${hasData ? "bg-emerald-400/40" : "bg-stone-300/40"}`} style={{ width: `${step.pct}%` }} />
-                              <span className="absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-stone-600">
-                                {step.value.toLocaleString()} ({step.pct}%)
-                              </span>
+                      <div className="rounded-xl border border-stone-200 bg-white p-5">
+                        <h3 className="mb-3 text-sm font-semibold text-stone-900">Conversion funnel</h3>
+                        <div className="space-y-3">
+                          {[
+                            { label: "Viewed demo link", pct: 100 },
+                            { label: "Started watching", pct: hasData && totalViews > 0 ? Math.round((totalPlays / totalViews) * 100) : 82 },
+                            { label: "Reached midpoint", pct: hasData ? Math.round(avgCompletionRate * 0.82) || 61 : 61 },
+                            { label: "Completed demo", pct: hasData ? Math.round(avgCompletionRate) : 44 },
+                            { label: "Clicked CTA", pct: hasData ? conversionRate : 22 },
+                          ].map((s) => (
+                            <div key={s.label} className="flex items-center gap-3">
+                              <div className="w-32 text-xs text-stone-500 text-right">{s.label}</div>
+                              <div className="flex-1 h-4 rounded-full bg-stone-100 overflow-hidden">
+                                <div className="h-full rounded-full bg-warm/60" style={{ width: `${s.pct}%` }} />
+                              </div>
+                              <div className="w-10 text-xs font-medium text-stone-600">{s.pct}%</div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </>
@@ -820,7 +715,23 @@ export default function Dashboard() {
 
           {/* ── KNOWLEDGE ── */}
           {activeTab === "knowledge" && (
-            <div className="space-y-5 px-8 py-6">
+            <div className="space-y-5" data-testid="knowledge-panel">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-stone-900">Knowledge Base</h2>
+                  <p className="mt-1 text-sm text-stone-500">Product docs, FAQs, and objection playbooks for your AI agents</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className={`flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50 ${uploadingFile ? "opacity-50 pointer-events-none" : ""}`}>
+                    {uploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    Upload File
+                    <input type="file" className="hidden" accept=".txt,.md,.csv,.json,.html,.htm,.xml,.log,.rtf,.yaml,.yml,.toml,.ini,.cfg,.env,.jsx,.tsx,.js,.ts,.py,.rb,.java,.css,.scss,.sql" onChange={handleFileUpload} />
+                  </label>
+                  <button onClick={() => setShowAddKnowledge(!showAddKnowledge)} className="flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white hover:opacity-80">
+                    <Plus className="h-4 w-4" /> Add Knowledge
+                  </button>
+                </div>
+              </div>
               {uploadMsg && (
                 <div className={`flex items-center gap-2 rounded-lg px-4 py-3 text-[13px] font-medium ${uploadMsg.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
                   {uploadMsg.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
@@ -913,7 +824,16 @@ export default function Dashboard() {
 
           {/* ── AGENTS ── */}
           {activeTab === "agents" && (
-            <div className="space-y-6 px-8 py-6">
+            <div className="space-y-6" data-testid="agents-panel">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-stone-900">Agents</h2>
+                  <p className="mt-1 text-sm text-stone-500">AI voices available for your product demos — powered by OpenAI TTS</p>
+                </div>
+                <button onClick={() => setShowCreateAgent(!showCreateAgent)} className="flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white hover:opacity-80">
+                  <Plus className="h-4 w-4" /> Create Agent
+                </button>
+              </div>
               {showCreateAgent && (
                 <div className="rounded-xl border-2 border-stone-300 p-6 space-y-4">
                   <h3 className="text-[14px] font-semibold">Create custom agent</h3>
@@ -1044,22 +964,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── COMING SOON PAGES ── */}
-          {(activeTab === "integrations" || activeTab === "ab_testing" || activeTab === "routing") && (
-            <div className="flex flex-col items-center justify-center py-32 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100">
-                {activeTab === "integrations" && <Settings className="h-7 w-7 text-stone-300" />}
-                {activeTab === "ab_testing" && <FlaskConical className="h-7 w-7 text-stone-300" />}
-                {activeTab === "routing" && <GitBranch className="h-7 w-7 text-stone-300" />}
-              </div>
-              <h3 className="mb-1 text-lg font-medium text-stone-600">{sectionTitle[activeTab].title}</h3>
-              <p className="text-[13px] text-stone-400">{sectionTitle[activeTab].subtitle}</p>
-              <span className="mt-4 rounded-full bg-stone-100 px-4 py-1.5 text-[12px] font-medium text-stone-400">Coming soon</span>
-            </div>
-          )}
-
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

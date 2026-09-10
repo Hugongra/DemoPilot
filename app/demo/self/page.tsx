@@ -446,7 +446,7 @@ export default function SelfDemoPage() {
           const res = await fetch("/api/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, voice: "nova" }),
+            body: JSON.stringify({ text, voice: "coral", language: locale }),
           });
           if (!res.ok) return;
           const blob = await res.blob();
@@ -693,7 +693,6 @@ export default function SelfDemoPage() {
     setInterimSpeech("");
     setTranscript((prev) => [...prev, { role: "viewer", text }]);
 
-    let didUi = false;
     try {
       const { list, map } = collectClickables(iframeRef.current);
       const res = await fetch("/api/demo-chat", {
@@ -704,6 +703,7 @@ export default function SelfDemoPage() {
           language: locale,
           url: currentUrlRef.current,
           elements: list,
+          history: [...transcript.slice(-7), { role: "viewer", text }],
         }),
       });
       const { reply, action } = await res.json();
@@ -712,7 +712,7 @@ export default function SelfDemoPage() {
           ? action
           : inferActionFromSpeech(text, list, currentUrlRef.current);
 
-      const uiTask = executeAction(resolvedAction, map).then((ok) => { didUi = ok; });
+      const uiTask = executeAction(resolvedAction, map);
 
       if (reply) {
         setTranscript((prev) => [...prev, { role: "agent", text: reply }]);
@@ -721,7 +721,7 @@ export default function SelfDemoPage() {
           const tts = await fetch("/api/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: reply, voice: "nova" }),
+            body: JSON.stringify({ text: reply, voice: "coral", language: locale }),
           });
           if (tts.ok) {
             const b = await tts.blob();
@@ -749,23 +749,12 @@ export default function SelfDemoPage() {
     finally {
       setSending(false);
       sendingRef.current = false;
-      if (didUi) {
-        setWalkthroughDone(true);
-        walkthroughDoneRef.current = true;
-      } else if (!walkthroughDoneRef.current) {
-        setStepIdx((i) => {
-          if (i >= STEPS.length - 1) {
-            setWalkthroughDone(true);
-            walkthroughDoneRef.current = true;
-            return STEPS.length - 1;
-          }
-          return i + 1;
-        });
-      }
+      setWalkthroughDone(true);
+      walkthroughDoneRef.current = true;
       setPaused(false);
       pausedRef.current = false;
     }
-  }, [stopAgentAudio, locale, executeAction]);
+  }, [stopAgentAudio, locale, executeAction, transcript]);
 
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
 

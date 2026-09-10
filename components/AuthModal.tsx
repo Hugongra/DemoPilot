@@ -69,18 +69,39 @@ export default function AuthModal({
   }
 
   async function handleOAuth(provider: "github" | "google") {
+    setError("");
+    setSuccess("");
     const supabase = createClient();
     if (!supabase) {
       setError("Supabase is not configured.");
       return;
     }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) setError(error.message);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          skipBrowserRedirect: true,
+          queryParams:
+            provider === "google"
+              ? { access_type: "offline", prompt: "select_account" }
+              : undefined,
+        },
+      });
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      if (!data.url) {
+        setError(
+          `No OAuth URL returned. Enable the ${provider} provider in Supabase → Authentication → Providers.`
+        );
+        return;
+      }
+      window.location.assign(data.url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "OAuth sign-in failed");
+    }
   }
 
   return (
@@ -114,8 +135,14 @@ export default function AuthModal({
             </div>
 
             <div className="p-6">
+              {error && (
+                <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {error}
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => handleOAuth("github")}
                   className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white text-sm font-medium transition-colors hover:bg-stone-50"
                 >
@@ -123,6 +150,7 @@ export default function AuthModal({
                   GitHub
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleOAuth("google")}
                   className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white text-sm font-medium transition-colors hover:bg-stone-50"
                 >
@@ -176,11 +204,6 @@ export default function AuthModal({
                   />
                 </div>
 
-                {error && (
-                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-                    {error}
-                  </p>
-                )}
                 {success && (
                   <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-600">
                     {success}
